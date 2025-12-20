@@ -1,0 +1,71 @@
+# OSINT Deep Research - Cursor Rules
+
+## Project Overview
+This is a deep research framework for OSINT with hierarchical validation and LLM-as-Judge voting.
+The project uses Poetry for dependency management and follows Python packaging best practices.
+
+## Package Structure
+- **odr/** - Main package
+  - **agents/** - Individual agent implementations
+  - **procedures/** - Deterministic workflows (Arazzo-inspired)
+  - **tools/** - Tool implementations for agents
+  - **integrations/** - External service integrations
+  - **main.py** - CLI entry point
+
+## Code Style & Conventions
+
+### Python
+- Target Python 3.11+
+- Use type hints for all function signatures
+- Use `ruff` for linting (configured in pyproject.toml)
+- Line length: 100 characters
+- Follow PEP 8 naming conventions
+
+### Imports
+- Use absolute imports within the package: `from odr.agents import ...`
+- Group imports: stdlib, third-party, local (ruff handles this)
+
+### Docstrings
+- Use Google-style docstrings
+- Document all public functions, classes, and modules
+
+## Dependency Management
+
+### Adding Dependencies
+Always use Poetry CLI to add dependencies (auto-resolves latest compatible versions):
+```bash
+poetry add <package>           # Runtime dependency
+poetry add --group dev <pkg>   # Development dependency
+```
+
+### Never
+- Never manually specify package versions in pyproject.toml
+- Never use pip install directly (use poetry add instead)
+- Never commit poetry.lock unless this is an application (library projects may exclude it)
+- Never make file changes using the CLI, or changes from CLI which may affect key files, unless you explicitly ask then receive permission. 
+
+## Testing
+- Tests go in the `tests/` directory
+- Use pytest as the test runner
+- Name test files: `test_*.py`
+- Name test functions: `test_*`
+
+Create and run tests as well - building them in their respective folder in tests, then running them from the main repo.
+
+## Commands
+
+### Development
+```bash
+poetry install              # Install all dependencies
+poetry run odr              # Run the CLI
+poetry run pytest           # Run tests
+poetry run ruff check .     # Lint
+poetry run ruff format .    # Format
+```
+
+### Environment
+```bash
+poetry shell                # Activate virtual environment
+poetry env info             # Show environment info
+```
+
