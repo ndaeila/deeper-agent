@@ -15,11 +15,11 @@ services:
       - "3000:3000"
     environment:
       - HOSTNAME=0.0.0.0
-      - DATABASE_URL=postgresql://langfuse:langfuse@db:5432/langfuse
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       - CLICKHOUSE_URL=http://clickhouse:8123
       - CLICKHOUSE_MIGRATION_URL=clickhouse://clickhouse:9000
-      - CLICKHOUSE_USER=default
-      - CLICKHOUSE_PASSWORD=clickhouse
+      - CLICKHOUSE_USER=${CLICKHOUSE_USER}
+      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD}
       - CLICKHOUSE_CLUSTER_ENABLED=false
       - REDIS_HOST=redis
       - REDIS_PORT=6379
@@ -27,24 +27,24 @@ services:
       - LANGFUSE_S3_EVENT_UPLOAD_BUCKET=langfuse
       - LANGFUSE_S3_EVENT_UPLOAD_REGION=us-east-1
       - LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT=http://minio:9002
-      - LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID=minioadmin
-      - LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY=minioadmin
+      - LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID=${MINIO_ROOT_USER}
+      - LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
       - LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE=true
-      - NEXTAUTH_URL=http://localhost:3000
-      - NEXTAUTH_SECRET=a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6
-      - SALT=a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6
-      - ENCRYPTION_KEY=a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
+      - NEXTAUTH_URL=${NEXTAUTH_URL}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - SALT=${SALT}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - TELEMETRY_ENABLED=false
       # Headless initialization
-      - LANGFUSE_INIT_ORG_ID=odr-org
-      - LANGFUSE_INIT_ORG_NAME=ODR Development
-      - LANGFUSE_INIT_PROJECT_ID=odr-project
-      - LANGFUSE_INIT_PROJECT_NAME=OSINT Deep Research
-      - LANGFUSE_INIT_PROJECT_PUBLIC_KEY=pk-lf-odr-dev-public
-      - LANGFUSE_INIT_PROJECT_SECRET_KEY=sk-lf-odr-dev-secret
-      - LANGFUSE_INIT_USER_EMAIL=admin@example.com
-      - LANGFUSE_INIT_USER_NAME=admin
-      - LANGFUSE_INIT_USER_PASSWORD=admin123
+      - LANGFUSE_INIT_ORG_ID=${LANGFUSE_INIT_ORG_ID}
+      - LANGFUSE_INIT_ORG_NAME=${LANGFUSE_INIT_ORG_NAME}
+      - LANGFUSE_INIT_PROJECT_ID=${LANGFUSE_INIT_PROJECT_ID}
+      - LANGFUSE_INIT_PROJECT_NAME=${LANGFUSE_INIT_PROJECT_NAME}
+      - LANGFUSE_INIT_PROJECT_PUBLIC_KEY=${LANGFUSE_INIT_PROJECT_PUBLIC_KEY}
+      - LANGFUSE_INIT_PROJECT_SECRET_KEY=${LANGFUSE_INIT_PROJECT_SECRET_KEY}
+      - LANGFUSE_INIT_USER_EMAIL=${LANGFUSE_INIT_USER_EMAIL}
+      - LANGFUSE_INIT_USER_NAME=${LANGFUSE_INIT_USER_NAME}
+      - LANGFUSE_INIT_USER_PASSWORD=${LANGFUSE_INIT_USER_PASSWORD}
     restart: unless-stopped
     deploy:
       resources:
@@ -66,10 +66,10 @@ services:
       minio:
         condition: service_healthy
     environment:
-      - DATABASE_URL=postgresql://langfuse:langfuse@db:5432/langfuse
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       - CLICKHOUSE_URL=http://clickhouse:8123
-      - CLICKHOUSE_USER=default
-      - CLICKHOUSE_PASSWORD=clickhouse
+      - CLICKHOUSE_USER=${CLICKHOUSE_USER}
+      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD}
       - CLICKHOUSE_CLUSTER_ENABLED=false
       - REDIS_HOST=redis
       - REDIS_PORT=6379
@@ -77,11 +77,11 @@ services:
       - LANGFUSE_S3_EVENT_UPLOAD_BUCKET=langfuse
       - LANGFUSE_S3_EVENT_UPLOAD_REGION=us-east-1
       - LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT=http://minio:9002
-      - LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID=minioadmin
-      - LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY=minioadmin
+      - LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID=${MINIO_ROOT_USER}
+      - LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
       - LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE=true
-      - SALT=a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6
-      - ENCRYPTION_KEY=a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
+      - SALT=${SALT}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
     restart: unless-stopped
     deploy:
       resources:
@@ -94,15 +94,15 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      - POSTGRES_USER=langfuse
-      - POSTGRES_PASSWORD=langfuse
-      - POSTGRES_DB=langfuse
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
     ports:
       - "5432:5432"
     volumes:
       - langfuse_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U langfuse -d langfuse"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 3s
       timeout: 3s
       retries: 10
@@ -111,8 +111,8 @@ services:
     image: clickhouse/clickhouse-server:latest
     restart: unless-stopped
     environment:
-      - CLICKHOUSE_USER=default
-      - CLICKHOUSE_PASSWORD=clickhouse
+      - CLICKHOUSE_USER=${CLICKHOUSE_USER}
+      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD}
     ports:
       - "8123:8123"
     volumes:
@@ -141,8 +141,8 @@ services:
     restart: unless-stopped
     command: server /data --address ":9002" --console-address ":9003"
     environment:
-      - MINIO_ROOT_USER=minioadmin
-      - MINIO_ROOT_PASSWORD=minioadmin
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
     ports:
       - "9002:9002"
       - "9003:9003"
