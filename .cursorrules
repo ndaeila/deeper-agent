@@ -52,6 +52,40 @@ poetry add --group dev <pkg>   # Development dependency
 
 Create and run tests as well - building them in their respective folder in tests, then running them from the main repo.
 
+## Matters of Taste (keep the codebase clean)
+
+These are conventions we should preserve for long-term maintainability. They are not “correctness” rules,
+but they strongly affect readability and how easy it is to change workflows safely.
+
+### Architecture & boundaries (LangGraph agents)
+- Prefer **small, focused modules**. If a module grows large or mixes concerns (state + node logic + wiring),
+  split it into a package.
+- For graph-style agents, keep a predictable layout:
+  - `state.py`: TypedDict/dataclasses that flow through the graph
+  - `nodes.py`: node implementations (pure-ish functions)
+  - `graph.py`: wiring only (StateGraph nodes/edges/routing)
+  - `agent.py`: wrapper class (config, initial state, run/stream helpers)
+  - `__init__.py`: explicit re-exports and `__all__`
+- **Node functions should be pure-ish**: do not mutate state in-place; return a minimal “patch” dict to merge.
+- Keep prompts as constants/templated helpers near the node that uses them; don’t bury prompt strings in `graph.py`.
+- Put shared types used across agents/workers in a neutral location (e.g. `odr/agents/types.py`) to avoid circular imports.
+
+### Error handling & optional dependencies
+- Prefer **fail-soft** at worker boundaries: workers return a structured error (`success=False`, `error=...`) rather than
+  raising, so fan-in compilation/judgment can see failures explicitly.
+- Optional dependencies must be **lazy-imported** inside the worker/tool that needs them, and must provide a short,
+  actionable install hint if missing (ideally printed immediately when the worker is instantiated).
+- If a worker requires env vars, check early and provide a one-line hint. Keep `.env-example` in sync.
+
+### Observability (Langfuse)
+- Any LLM created inside the project should go through `odr.integrations.observability.get_observed_llm`
+  (don’t construct provider clients directly inside nodes/workers).
+- Where reasonable, include trace-friendly metadata (worker_id, worker_type, iteration) in prompts or run context.
+
+### Public API stability
+- When refactoring modules, keep import paths stable via re-exports and an explicit `__all__`.
+- Avoid heavy side effects in package `__init__.py` (keep it import-light).
+
 ## Commands
 
 ### Development

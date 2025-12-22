@@ -1,5 +1,6 @@
 """Tests for the Retriever agent."""
 
+import random
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -12,9 +13,11 @@ from odr.agents.retriever import (
     WorkerTask,
     WorkerState,
     choose_workers,
+    decide_next_action,
     fan_out_to_workers,
     judgment,
     observe_and_compile,
+    route_after_decision,
     route_after_judgment,
     worker_node,
 )
@@ -25,6 +28,8 @@ def mock_llm():
     """Create a mock LLM that returns predictable responses."""
     llm = MagicMock()
     llm.invoke.return_value = MagicMock(content="Mock LLM response")
+    # Force fallback paths that use .invoke() (MagicMock otherwise pretends to support everything).
+    llm.with_structured_output = None
     return llm
 
 
@@ -38,8 +43,14 @@ def sample_state() -> RetrieverState:
         worker_results=[],
         compiled_output="",
         judgment_decision=None,
+        judge_feedback=None,
+        compiled_report=None,
+        next_action=None,
+        next_worker_guidance=None,
+        final_status=None,
         iteration_count=0,
         max_iterations=3,
+        max_workers=5,
     )
 
 
@@ -100,12 +111,12 @@ class TestJudgmentDecision:
 class TestChooseWorkers:
     """Tests for the choose_workers node."""
 
-    def test_creates_two_worker_tasks(self, sample_state, mock_llm):
-        """Test that choose_workers creates exactly 2 worker tasks."""
+    def test_creates_up_to_max_workers(self, sample_state, mock_llm):
+        """Test that choose_workers creates between 1 and max_workers tasks."""
         result = choose_workers(sample_state, mock_llm)
 
         assert "worker_tasks" in result
-        assert len(result["worker_tasks"]) == 2
+        assert 1 <= len(result["worker_tasks"]) <= sample_state["max_workers"]
 
     def test_increments_iteration_count(self, sample_state, mock_llm):
         """Test that iteration count is incremented."""
@@ -138,7 +149,7 @@ class TestWorkerNode:
             iteration=1,
         )
 
-        result = worker_node(worker_state, mock_llm)
+        result = worker_node(worker_state, mock_llm, worker_factories=[], rng=random.Random(0))
 
         assert "worker_results" in result
         assert len(result["worker_results"]) == 1
@@ -154,7 +165,7 @@ class TestWorkerNode:
             iteration=1,
         )
 
-        worker_node(worker_state, mock_llm)
+        worker_node(worker_state, mock_llm, worker_factories=[], rng=random.Random(0))
 
         mock_llm.invoke.assert_called_once()
 
@@ -204,34 +215,62 @@ class TestJudgment:
     """Tests for the judgment node."""
 
     def test_returns_approve_decision(self, sample_state, mock_llm):
-        """Test that judgment returns an APPROVE decision."""
-        mock_llm.invoke.return_value = MagicMock(content="APPROVE - looks good")
+        """Test that judgment returns an APPROVE decision (via counsel)."""
         sample_state["compiled_output"] = "Good output"
 
-        result = judgment(sample_state, mock_llm)
+        counsel = MagicMock()
+        counsel.evaluate.return_value = {
+            "final_decision": JudgmentDecision.APPROVE,
+            "deliberation_summary": "approve",
+        }
+        result = judgment(sample_state, counsel)
 
         assert result["judgment_decision"] == JudgmentDecision.APPROVE
+        assert result["judge_feedback"] == "approve"
 
     def test_returns_retry_decision(self, sample_state, mock_llm):
-        """Test that judgment returns a RETRY decision."""
-        mock_llm.invoke.return_value = MagicMock(content="RETRY - needs more work")
+        """Test that judgment returns a RETRY decision (via counsel)."""
         sample_state["compiled_output"] = "Incomplete output"
 
-        result = judgment(sample_state, mock_llm)
+        counsel = MagicMock()
+        counsel.evaluate.return_value = {
+            "final_decision": JudgmentDecision.RETRY,
+            "deliberation_summary": "retry",
+        }
+        result = judgment(sample_state, counsel)
 
         assert result["judgment_decision"] == JudgmentDecision.RETRY
+        assert result["judge_feedback"] == "retry"
 
-    def test_forces_approve_at_max_iterations(self, sample_state, mock_llm):
-        """Test that max iterations forces APPROVE."""
+class TestDecideNextAction:
+    """Tests for the decide_next_action node."""
+
+    def test_stops_best_effort_at_iteration_cap(self, sample_state, mock_llm):
         sample_state["iteration_count"] = 3
         sample_state["max_iterations"] = 3
         sample_state["compiled_output"] = "Output"
+        sample_state["judgment_decision"] = JudgmentDecision.RETRY
+        sample_state["judge_feedback"] = "needs more sources"
+        result = decide_next_action(sample_state, mock_llm)
+        assert result["next_action"] == "stop_best_effort"
+        assert result["final_status"] == "best_effort"
 
-        result = judgment(sample_state, mock_llm)
+    def test_continues_when_judge_retries(self, sample_state, mock_llm):
+        sample_state["iteration_count"] = 1
+        sample_state["max_iterations"] = 3
+        sample_state["compiled_output"] = "Output"
+        sample_state["judgment_decision"] = JudgmentDecision.RETRY
+        result = decide_next_action(sample_state, mock_llm)
+        assert result["next_action"] == "continue"
 
-        assert result["judgment_decision"] == JudgmentDecision.APPROVE
-        # LLM should not be called when max iterations reached
-        mock_llm.invoke.assert_not_called()
+    def test_finishes_when_no_retry(self, sample_state, mock_llm):
+        sample_state["iteration_count"] = 1
+        sample_state["max_iterations"] = 3
+        sample_state["compiled_output"] = "Output"
+        sample_state["judgment_decision"] = JudgmentDecision.APPROVE
+        result = decide_next_action(sample_state, mock_llm)
+        assert result["next_action"] == "finish"
+        assert result["final_status"] == "success"
 
 
 class TestRouteAfterJudgment:
@@ -260,6 +299,18 @@ class TestRouteAfterJudgment:
         result = route_after_judgment(sample_state)
 
         assert result == "__end__"
+
+
+class TestRouteAfterDecision:
+    """Tests for the route_after_decision function."""
+
+    def test_routes_to_choose_workers_on_continue(self, sample_state):
+        sample_state["next_action"] = "continue"
+        assert route_after_decision(sample_state) == "choose_workers"
+
+    def test_routes_to_end_on_finish(self, sample_state):
+        sample_state["next_action"] = "finish"
+        assert route_after_decision(sample_state) == "__end__"
 
 
 class TestFanOutToWorkers:
@@ -324,6 +375,7 @@ class TestRetrieverClass:
             retriever = Retriever.__new__(Retriever)
             retriever.llm = mock_llm
             retriever.max_iterations = 3
+            retriever.max_workers = 5
             retriever.graph = MagicMock()
             retriever.graph.invoke.return_value = {"compiled_output": "Final result"}
 
@@ -335,4 +387,10 @@ class TestRetrieverClass:
             assert call_args["input"] == "Test input"
             assert call_args["iteration_count"] == 0
             assert call_args["max_iterations"] == 3
+            assert call_args["max_workers"] == 5
+            assert call_args["judge_feedback"] is None
+            assert call_args["compiled_report"] is None
+            assert call_args["next_action"] is None
+            assert call_args["next_worker_guidance"] is None
+            assert call_args["final_status"] is None
 

@@ -113,3 +113,26 @@ poetry add langfuse
 2. Check your API keys are correct
 3. Verify `LANGFUSE_HOST` matches your setup
 
+### JWT Session Error (decryption operation failed)
+This error occurs when NextAuth cannot decrypt session tokens. Common causes:
+
+1. **Missing or changed secrets**: Ensure your `.env` file has valid values for:
+   - `NEXTAUTH_SECRET` (32+ character random string)
+   - `SALT` (32+ character random string)
+   - `ENCRYPTION_KEY` (64-character hex string)
+   - `NEXTAUTH_URL` (should be `http://localhost:3000`)
+
+2. **Stale browser session**: Clear cookies for `localhost:3000` or use incognito mode
+
+3. **Generate new secrets**: Run the helper script:
+   ```bash
+   ./scripts/generate-langfuse-secrets.sh
+   ```
+   Then add the output to your `.env` file and restart:
+   ```bash
+   docker compose down
+   docker compose up -d
+   ```
+
+**Note**: Changing secrets will invalidate existing sessions. Users will need to log in again.
+

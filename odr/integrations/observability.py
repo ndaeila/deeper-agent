@@ -35,6 +35,35 @@ from langchain_openai import ChatOpenAI
 
 logger = logging.getLogger(__name__)
 
+class _QuietOtelHandler(logging.Handler):
+    """Handler that shows one-liner per OTEL error instead of verbose stack traces."""
+
+    def emit(self, record: logging.LogRecord) -> None:
+        # Only warn if Langfuse is supposed to be enabled
+        if os.getenv("LANGFUSE_ENABLED", "true").lower() == "false":
+            return
+        # Check if this is a connection/export error
+        msg = str(record.msg).lower() if record.msg else ""
+        exc_text = str(record.exc_info[1]).lower() if record.exc_info and record.exc_info[1] else ""
+        if "export" in msg or "connection" in exc_text or "refused" in exc_text:
+            print("⚠ Langfuse tracing failed (connection refused)")
+
+
+# Replace default handlers with our quiet one for OpenTelemetry loggers
+_quiet_handler = _QuietOtelHandler()
+for _logger_name in (
+    "opentelemetry",
+    "opentelemetry.exporter",
+    "opentelemetry.exporter.otlp",
+    "opentelemetry.exporter.otlp.proto.http",
+    "opentelemetry.exporter.otlp.proto.http.trace_exporter",
+    "opentelemetry.sdk",
+    "opentelemetry.sdk._shared_internal",
+):
+    _otel_logger = logging.getLogger(_logger_name)
+    _otel_logger.handlers = [_quiet_handler]
+    _otel_logger.propagate = False
+
 # Lazy import to avoid errors when langfuse is not configured
 _langfuse_handler: BaseCallbackHandler | None = None
 _langfuse_init_attempted: bool = False
