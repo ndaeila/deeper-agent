@@ -45,7 +45,7 @@ class Retriever:
         self,
         llm: BaseChatModel,
         max_iterations: int = 3,
-        max_workers: int = 5,
+        max_workers: int = 2,
         judge_counsel: JudgeCounsel | None = None,
         worker_factories: Sequence[WorkerFactory] | None = None,
         worker_factory_seed: int | None = None,
@@ -55,7 +55,7 @@ class Retriever:
         Args:
             llm: Language model for supervisor, workers, and observer.
             max_iterations: Maximum number of retry iterations allowed.
-            max_workers: Maximum number of workers per iteration (1-5).
+            max_workers: Maximum number of workers per iteration (1-5, default 2 for browser workloads).
             judge_counsel: Judge Counsel agent for judgment.
                           Defaults to default model if not provided.
             worker_factories: Factories for creating workers (defaults to LLMWorkerFactory).

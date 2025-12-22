@@ -87,7 +87,8 @@ class BrowserUseWorkerConfig:
     reasoning_effort: str = "low"
     headless: bool = False
     tavily_max_results: int = 5
-    max_steps: int = 5
+    max_steps: int = 15  # Hard limit on browser agent steps
+    max_actions: int = 15  # Some browser_use versions use this instead
     use_search_tool: bool = True  # Set False to disable Tavily/SerpApi search tool
 
 
@@ -182,9 +183,13 @@ class BrowserUseWorker:
             f"2. Open 1-2 of the best result URLs in the browser.\n"
             f"3. Extract the specific facts/quotes you need with their source URLs.\n"
             f"4. Stop and return findings with cited URLs.\n\n"
-            f"Hard constraint: max {self.config.max_steps} browser steps.\n"
-            "Do NOT navigate directly to URLs you haven't discovered via search.\n"
-            "You MUST cite the exact URL for each fact. If uncertain, say so."
+            f"HARD CONSTRAINTS:\n"
+            f"- Max {self.config.max_steps} browser steps total.\n"
+            f"- If search quota is exhausted or blocked, STOP IMMEDIATELY with whatever you have.\n"
+            f"- Do NOT wait or retry indefinitely. Return partial results if needed.\n"
+            f"- Do NOT navigate directly to URLs you haven't discovered via search.\n"
+            f"- You MUST cite the exact URL for each fact. If uncertain, say so.\n\n"
+            f"If blocked/quota exhausted: call done() with success=True and your best partial findings."
         )
 
         # Enforce step budget when supported by the installed browser_use version.
@@ -193,8 +198,12 @@ class BrowserUseWorker:
             agent_kwargs["tools"] = tools
         try:
             sig = inspect.signature(Agent)  # some versions expose Agent as a class/callable
-            if "max_steps" in sig.parameters:
+            params = sig.parameters
+            # Try both parameter names (browser_use versions vary)
+            if "max_steps" in params:
                 agent_kwargs["max_steps"] = self.config.max_steps
+            if "max_actions" in params:
+                agent_kwargs["max_actions"] = self.config.max_actions
         except (TypeError, ValueError):
             # Best-effort; prompt-level constraint still applies.
             pass
@@ -247,59 +256,162 @@ def _safe_serialize_history(history: Any) -> Any:
 
 
 def _format_browser_use_history(history: Any) -> str:
-    """Extract full running context from browser_use history, not just final result.
+    """Extract full running context from browser_use history (v0.11.x).
 
     This captures all extractions, navigations, and intermediate findings so the
     compile step has the complete picture rather than just the agent's final summary.
     """
     sections: list[str] = []
 
-    # 1. Collect all step-by-step actions and extractions
-    all_results = getattr(history, "all_results", None) or []
-    if isinstance(all_results, list):
-        for idx, item in enumerate(all_results, start=1):
-            step_lines: list[str] = [f"--- Step {idx} ---"]
+    # Helper to safely get list attribute
+    def _get_list_attr(obj: Any, *names: str) -> list[Any]:
+        for name in names:
+            try:
+                val = getattr(obj, name, None)
+                if val is not None:
+                    if callable(val):
+                        val = val()
+                    if isinstance(val, (list, tuple)):
+                        return list(val)
+            except Exception:
+                pass
+        return []
 
-            # Get URL for this step
-            if isinstance(item, dict):
-                page_url = item.get("url") or item.get("page_url") or item.get("current_url")
-                extracted = item.get("extracted_content")
-                action = item.get("action") or item.get("action_name")
+    # 1. Extract all URLs visited (browser_use 0.11.x has a .urls property)
+    urls_visited: list[str] = []
+    try:
+        urls_attr = getattr(history, "urls", None)
+        if urls_attr:
+            if callable(urls_attr):
+                urls_attr = urls_attr()
+            if isinstance(urls_attr, (list, tuple)):
+                urls_visited = [str(u) for u in urls_attr if u]
+    except Exception:
+        pass
+    if urls_visited:
+        sections.append("=== URLs Visited ===\n" + "\n".join(f"  - {u}" for u in urls_visited))
+
+    # 2. Extract all content extracted (browser_use 0.11.x has .extracted_content)
+    extracted_content: list[str] = []
+    try:
+        ec_attr = getattr(history, "extracted_content", None)
+        if ec_attr:
+            if callable(ec_attr):
+                ec_attr = ec_attr()
+            if isinstance(ec_attr, (list, tuple)):
+                extracted_content = [str(e) for e in ec_attr if e and str(e).strip()]
+            elif isinstance(ec_attr, str) and ec_attr.strip():
+                extracted_content = [ec_attr]
+    except Exception:
+        pass
+    if extracted_content:
+        content_section = "=== Extracted Content ===\n"
+        for idx, content in enumerate(extracted_content, 1):
+            # Bound each extraction
+            excerpt = content[:3000] if len(content) > 3000 else content
+            content_section += f"\n--- Extraction {idx} ---\n{excerpt}\n"
+        sections.append(content_section)
+
+    # 3. Extract model thoughts/reasoning (browser_use 0.11.x has .model_thoughts)
+    model_thoughts: list[Any] = _get_list_attr(history, "model_thoughts")
+    if model_thoughts:
+        thoughts_section = "=== Agent Reasoning ===\n"
+        for idx, thought in enumerate(model_thoughts, 1):
+            # Thought could be object or dict
+            if hasattr(thought, "evaluation"):
+                eval_text = getattr(thought, "evaluation", "") or ""
+                memory_text = getattr(thought, "memory", "") or ""
+                goal_text = getattr(thought, "next_goal", "") or ""
+                thoughts_section += f"\n[Step {idx}]\n"
+                if eval_text:
+                    thoughts_section += f"  Eval: {eval_text[:500]}\n"
+                if memory_text:
+                    thoughts_section += f"  Memory: {memory_text[:500]}\n"
+                if goal_text:
+                    thoughts_section += f"  Goal: {goal_text[:300]}\n"
+            elif isinstance(thought, dict):
+                thoughts_section += f"\n[Step {idx}] {thought}\n"
             else:
-                page_url = (
-                    getattr(item, "url", None)
-                    or getattr(item, "page_url", None)
-                    or getattr(item, "current_url", None)
-                )
-                extracted = getattr(item, "extracted_content", None)
-                action = getattr(item, "action", None) or getattr(item, "action_name", None)
+                thoughts_section += f"\n[Step {idx}] {str(thought)[:500]}\n"
+        sections.append(thoughts_section)
 
-            if page_url:
-                step_lines.append(f"URL: {page_url}")
-            if action:
-                step_lines.append(f"Action: {action}")
-            if isinstance(extracted, str) and extracted.strip():
-                # Include full extraction (bounded per step)
-                excerpt = extracted[:2000] if len(extracted) > 2000 else extracted
-                step_lines.append(f"Extracted:\n{excerpt}")
+    # 4. Extract actions taken (browser_use 0.11.x has .model_actions)
+    model_actions: list[Any] = _get_list_attr(history, "model_actions", "model_actions_filtered")
+    if model_actions:
+        actions_section = "=== Actions Taken ===\n"
+        for idx, action in enumerate(model_actions, 1):
+            if hasattr(action, "model_dump"):
+                action_dict = action.model_dump()
+            elif isinstance(action, dict):
+                action_dict = action
+            else:
+                actions_section += f"  {idx}. {str(action)[:200]}\n"
+                continue
+            # Format action nicely
+            for action_name in ["do_search", "go_to_url", "extract_page_content", "done", 
+                                "click_element", "input_text", "search_google"]:
+                if action_name in action_dict and action_dict[action_name]:
+                    action_data = action_dict[action_name]
+                    if isinstance(action_data, dict):
+                        action_str = ", ".join(f"{k}={v!r}" for k, v in action_data.items() 
+                                               if v is not None)
+                    else:
+                        action_str = str(action_data)[:200]
+                    actions_section += f"  {idx}. {action_name}: {action_str}\n"
+        sections.append(actions_section)
 
-            if len(step_lines) > 1:  # Has more than just the header
-                sections.append("\n".join(step_lines))
+    # 5. Extract action results (browser_use 0.11.x has .action_results)
+    action_results: list[Any] = _get_list_attr(history, "action_results")
+    if action_results:
+        results_section = "=== Action Results ===\n"
+        for idx, result in enumerate(action_results, 1):
+            if hasattr(result, "extracted_content"):
+                extracted = getattr(result, "extracted_content", None)
+                is_done = getattr(result, "is_done", False)
+                error = getattr(result, "error", None)
+                if extracted and str(extracted).strip():
+                    excerpt = str(extracted)[:2000]
+                    results_section += f"\n[Result {idx}]\n{excerpt}\n"
+                if error:
+                    results_section += f"\n[Result {idx} ERROR] {error}\n"
+                if is_done:
+                    results_section += f"[Result {idx} DONE]\n"
+            elif isinstance(result, dict):
+                results_section += f"\n[Result {idx}] {result}\n"
+        sections.append(results_section)
 
-    # 2. Get the final result/done message if available
-    final_result = getattr(history, "final_result", None) or getattr(history, "result", None)
+    # 6. Get the final result/done message if available (properly call if method)
+    final_result = None
+    try:
+        final_result_attr = getattr(history, "final_result", None)
+        if callable(final_result_attr):
+            final_result = final_result_attr()
+        elif final_result_attr is not None:
+            final_result = final_result_attr
+    except Exception:
+        pass
+
     if final_result:
-        if hasattr(final_result, "text"):
-            final_text = final_result.text
+        text_attr = getattr(final_result, "text", None)
+        if isinstance(text_attr, str):
+            final_text: str | None = text_attr
         elif isinstance(final_result, dict):
             final_text = final_result.get("text") or str(final_result)
+        elif isinstance(final_result, str):
+            final_text = final_result
         else:
-            final_text = str(final_result)
-        sections.append(f"--- Final Result ---\n{final_text}")
+            final_text = None
 
-    # 3. If we got nothing structured, fall back to str(history)
+        if final_text:
+            sections.append(f"=== Final Result ===\n{final_text}")
+
+    # 7. If we got nothing structured, fall back to a cleaned str(history)
     if not sections:
+        # Try to extract just the useful parts
         text = str(history)
+        # Don't include bound method garbage
+        if "<bound method" in text:
+            text = "[No structured content extracted from history]"
         if len(text) > 8000:
             text = text[:8000] + "\n\n[truncated]"
         return text
@@ -312,45 +424,63 @@ def _format_browser_use_history(history: Any) -> str:
 
 
 def _extract_evidence_from_history(history: Any) -> list[dict[str, Any]]:
-    """Extract URLs/snippets from history when possible."""
+    """Extract URLs/snippets from browser_use 0.11.x history."""
     evidence: list[dict[str, Any]] = []
     url_re = re.compile(r"https?://[^\s\]\)\}>,\"']+")
     seen_urls: set[str] = set()
 
-    all_results = getattr(history, "all_results", None)
-    if isinstance(all_results, list):
-        for item in all_results:
-            item_url = None
-            if isinstance(item, dict):
-                item_url = item.get("url") or item.get("page_url") or item.get("source_url")
-            else:
-                item_url = (
-                    getattr(item, "url", None)
-                    or getattr(item, "page_url", None)
-                    or getattr(item, "source_url", None)
-                )
-            extracted = (
-                item.get("extracted_content")
-                if isinstance(item, dict)
-                else getattr(item, "extracted_content", None)
-            )
-            excerpt = extracted[:500] if isinstance(extracted, str) else None
+    # Helper to safely get list attribute
+    def _get_list(obj: Any, *names: str) -> list[Any]:
+        for name in names:
+            try:
+                val = getattr(obj, name, None)
+                if val is not None:
+                    if callable(val):
+                        val = val()
+                    if isinstance(val, (list, tuple)):
+                        return list(val)
+            except Exception:
+                pass
+        return []
 
-            if isinstance(item_url, str) and item_url.startswith("http"):
-                u = item_url.rstrip(".,);]")
-                if u not in seen_urls:
-                    seen_urls.add(u)
-                    evidence.append({"url": u, "excerpt": excerpt})
+    # 1. Get URLs directly from .urls property (browser_use 0.11.x)
+    urls_visited = _get_list(history, "urls")
+    for url in urls_visited:
+        u = str(url).rstrip(".,);]")
+        if u.startswith("http") and u not in seen_urls:
+            seen_urls.add(u)
+            evidence.append({"url": u, "excerpt": None})
 
-            if isinstance(extracted, str) and extracted.strip():
-                urls = [m.group(0).rstrip(".,);]") for m in url_re.finditer(extracted)]
-                for url in urls[:5]:
-                    if url not in seen_urls:
-                        seen_urls.add(url)
-                        evidence.append({"url": url, "excerpt": excerpt})
-                if not urls and "http" in extracted:
-                    # Keep a trace even if regex fails; normalizer may recover URLs from findings.
-                    evidence.append({"excerpt": excerpt})
+    # 2. Get extracted content from .extracted_content property
+    try:
+        ec_attr = getattr(history, "extracted_content", None)
+        if ec_attr:
+            if callable(ec_attr):
+                ec_attr = ec_attr()
+            if isinstance(ec_attr, (list, tuple)):
+                for content in ec_attr:
+                    if isinstance(content, str) and content.strip():
+                        # Extract URLs from content
+                        found_urls = [m.group(0).rstrip(".,);]") for m in url_re.finditer(content)]
+                        excerpt = content[:500]
+                        for url in found_urls[:5]:
+                            if url not in seen_urls:
+                                seen_urls.add(url)
+                                evidence.append({"url": url, "excerpt": excerpt})
+    except Exception:
+        pass
+
+    # 3. Get from action_results
+    action_results = _get_list(history, "action_results")
+    for result in action_results:
+        extracted = getattr(result, "extracted_content", None)
+        if isinstance(extracted, str) and extracted.strip():
+            excerpt = extracted[:500]
+            found_urls = [m.group(0).rstrip(".,);]") for m in url_re.finditer(extracted)]
+            for url in found_urls[:5]:
+                if url not in seen_urls:
+                    seen_urls.add(url)
+                    evidence.append({"url": url, "excerpt": excerpt})
 
     return evidence[:50]
 

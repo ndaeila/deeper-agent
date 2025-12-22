@@ -52,6 +52,8 @@ poetry add --group dev <pkg>   # Development dependency
 
 Create and run tests as well - building them in their respective folder in tests, then running them from the main repo.
 
+Before making a change to the code base, test it on a small scale from the command line to affirm a package functions as expected. 
+
 ## Matters of Taste (keep the codebase clean)
 
 These are conventions we should preserve for long-term maintainability. They are not “correctness” rules,
