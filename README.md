@@ -39,24 +39,19 @@ I hope to fix this issue by using a combination of Tool-Calls that 1) fan-out an
 
 ### None of this is scientifically backed
 
-It's a cardinal sin to just guess, but here I am. 
+It's probably a cardinal sin to just guess an approach, but here I am. 
 
 I want to **attempt this project with a fresh perspective before poisoning my own context** by reading other research about Deep Research agents. I will research later, once I'm done exploring, or have exhausted my own creativity and require better results. Unfortunately, one of the main caveats of my decision to attempt original thoughts first is that they are more likely to be incorrect (hence this entire experiment, ironically) - so this project may not perform well. As of now, I have a running list of assumptions influencing my design based on what I have seen in the wild:
 
-- ReAct / ReWOO Loops (+ Nested) Work, But They Need More Focus - Previous steps shouldn't set future focus, but they should definitely impact future focus somehow. 
+- ReAct / ReWOO Loops (+ Nested) Work, But They Might Need More Focus - Previous steps shouldn't knock future focus on a separate track from the original query, but past should definitely impact future focus somehow. 
 
-- 10 SLMs as a judge perform better than 1 LLM, and may judge faster by running in parallel. This probably isn't true - but I need speed, and also want an excuse to try Nvidia's recent Nemotron Nano SLM. 
+- 10 SLMs as a judge perform better than 1 LLM, and may judge faster by running in parallel. This probably isn't true - but I need speed and accuracy. 
 
-- Particularly for ability to do OSINT via Workers/Tool Calls: I assume Web Search and Browser-Use are enough. Browser-Use already performs amazingly for OSINT, but for the purposes of doing one task. 
+- Particularly for ability to do OSINT via Workers/Tool Calls: I assume Web Search and Browser-Use are enough. Browser-Use already performs amazingly for OSINT, but for the purposes of doing one (very specific) task. 
 
 - (Probably many other assumptions - the list is endless since I'm just going by taste - but I will document why I make my decisions somewhere).
 
-I'm probably going to build evals later too, on a per-agent per-procedure basis, and run benchmarks later too.
+I'm probably going to build evals later, on a per-agent per-procedure basis, and run benchmarks later too, once I know what I'm doing. 
 
 
-### Why so much hierarchy (nested workflows)?
-
-Hierarchy in Corporation Organizational Structures increase effectivity of bad employees. Likewise, I'm hoping hierarchy in Agentic workflows prove the same result, at the cost of more LLM usage. Even if it costs 3000$ a week (today), can it actually surface insights better than a security professional investigating X entity? Guarantees are valuable.
-
-Also, long-running context windows degrade agent performance (today - 12/17/2025), so limiting agents to smaller procedures may improve effectuality of individual deliverables. 
 
