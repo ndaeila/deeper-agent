@@ -1,4 +1,4 @@
-# OSINT Deep Research
+# (outdated docs) OSINT Deep Research
 
 This project attempts to show how forcing a model to overthink and validate hierarchically for every decision may allow it to have trustworthy creative freedom. Broader prompting with checks-and-balances at each step of the way may apply enough constraint to be precise, while allowing enough creative freedom to find accuracy. 
 
