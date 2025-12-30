@@ -28,6 +28,7 @@ from langgraph.graph import END, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Send
 
+from odr.factory import DefaultLLMFactory
 from odr.integrations.observability import get_observed_llm
 
 
@@ -36,6 +37,14 @@ class JudgmentDecision(str, Enum):
 
     APPROVE = "approve"
     RETRY = "retry"
+
+
+class EvaluationMode(str, Enum):
+    """How strict the counsel should be when grading OSINT outputs."""
+
+    STRICT = "strict"
+    BALANCED = "balanced"
+    BEST_EFFORT = "best_effort"
 
 
 class JudgeVote(TypedDict):
@@ -71,6 +80,7 @@ class JudgeCounselState(TypedDict):
     judge_votes: Annotated[list[JudgeVote], operator.add]
     final_decision: JudgmentDecision | None
     deliberation_summary: str
+    evaluation_mode: EvaluationMode
 
 
 class JudgeWorkerState(TypedDict):
@@ -82,6 +92,7 @@ class JudgeWorkerState(TypedDict):
     compiled_output: str
     iteration_count: int
     max_iterations: int
+    evaluation_mode: EvaluationMode
 
 
 # Default judge personas for OSINT evidence validation
@@ -179,12 +190,38 @@ def judge_worker(state: JudgeWorkerState, llm: BaseChatModel) -> dict[str, Any]:
     compiled_output = state["compiled_output"]
     iteration = state["iteration_count"]
     max_iterations = state["max_iterations"]
+    evaluation_mode = state.get("evaluation_mode", EvaluationMode.BALANCED)
 
+    mode_guidance = ""
+    if evaluation_mode == EvaluationMode.BEST_EFFORT:
+        mode_guidance = """EVALUATION MODE: BEST_EFFORT
+- You are grading for usefulness and honesty, not perfect verification.
+- Paywalls/login walls are common; do NOT require primary sources if unavailable.
+- People-data brokers/aggregators are acceptable
+  ("directories list…", "aggregators indicate…") and avoids overconfident wording.
+- APPROVE if: the answer ties key claims to citations and cites multiple URLs (even if some are self-published/brokers), clearly stating uncertainties/limitations if any.
+- RETRY only if: the output makes strong claims without citations, or invents URLs/details."""
+    elif evaluation_mode == EvaluationMode.STRICT:
+        mode_guidance = """EVALUATION MODE: STRICT
+- Require strong cross-corroboration and prefer primary/official sources.
+- RETRY if core claims rely mainly on self-published pages or aggregators without independent corroboration."""
+    else:
+        mode_guidance = """EVALUATION MODE: BALANCED
+- Prefer independent corroboration, but accept best-effort OSINT summaries when limitations are clearly stated.
+- Aggregators are acceptable as supporting signals, not definitive proof, unless corroborated."""
+
+
+# ================================
+# SYSTEM PROMPT
+# note - how can we confirm URL sources are not faked? Should I take it out of the prompt? 
+# ================================
     system_prompt = f"""{persona}
 
 You are a judge on an OSINT evidence validation counsel. Your role is to evaluate 
 whether collected evidence is accurate, properly attributed, and actually supports 
 the research query.
+
+{mode_guidance}
 
 CRITICAL EVALUATION CRITERIA:
 1. ENTITY ACCURACY: Does evidence clearly identify the correct subject? Could this 
@@ -206,7 +243,7 @@ DECISION CRITERIA:
 
 Respond in this exact format:
 DECISION: [APPROVE or RETRY]
-CONFIDENCE: [0.0 to 1.0]
+CONFIDENCE: [0.00 to 1.00]
 REASONING: [Explain your evidence assessment in 2-3 sentences, noting specific concerns]"""
 
     messages = [
@@ -218,7 +255,7 @@ REASONING: [Explain your evidence assessment in 2-3 sentences, noting specific c
         ),
     ]
 
-    response = llm.invoke(messages)
+    response = llm.invoke(messages, config={"run_name": f"judge_worker:{judge_id}"})
     content = response.content if isinstance(response.content, str) else str(response.content)
 
     # Parse the response
@@ -269,6 +306,7 @@ def fan_out_to_judges(state: JudgeCounselState) -> list[Send]:
     """
     num_judges = state.get("num_judges", 10)
     personas = state.get("personas", DEFAULT_PERSONAS)
+    evaluation_mode = state.get("evaluation_mode", EvaluationMode.BALANCED)
 
     # Assign a random persona to each judge
     assigned_personas = [random.choice(personas) for _ in range(num_judges)]
@@ -283,6 +321,7 @@ def fan_out_to_judges(state: JudgeCounselState) -> list[Send]:
                 compiled_output=state["compiled_output"],
                 iteration_count=state["iteration_count"],
                 max_iterations=state["max_iterations"],
+                evaluation_mode=evaluation_mode,
             ),
         )
         for i in range(1, num_judges + 1)
@@ -332,16 +371,16 @@ def aggregate_votes(state: JudgeCounselState) -> dict[str, Any]:
     vote_breakdown = f"APPROVE: {approve_count} votes (weight: {approve_weight:.2f}), "
     vote_breakdown += f"RETRY: {retry_count} votes (weight: {retry_weight:.2f})"
 
-    reasoning_samples = []
-    for vote in votes[:3]:  # Sample first 3 reasonings
-        reasoning_samples.append(f"- Judge {vote['judge_id']}: {vote['reasoning'][:100]}...")
+    judges_decision_reasoning = []
+    for vote in votes:  # Include all reasonings
+        judges_decision_reasoning.append(f"- Judge {vote['judge_id']}: {vote['reasoning']}")
 
     deliberation_summary = (
         f"Judge Counsel Deliberation Complete\n"
         f"{'=' * 40}\n"
         f"Final Decision: {final_decision.value.upper()}\n"
         f"Vote Breakdown: {vote_breakdown}\n"
-        f"\nSample Reasoning:\n" + "\n".join(reasoning_samples)
+        f"\nCounsel Reasons for Decision:\n" + "\n".join(judges_decision_reasoning)
     )
 
     return {
@@ -412,7 +451,7 @@ class JudgeCounsel:
 
         # Custom: 5 judges with custom personas
         counsel = JudgeCounsel(
-            model="gpt-4o-mini",
+            model="gpt-5-nano",
             num_judges=5,
             personas=[
                 "You are a security expert focused on threat analysis.",
@@ -432,19 +471,23 @@ class JudgeCounsel:
 
     DEFAULT_MODEL = "gpt-5-nano-2025-08-07"
     DEFAULT_NUM_JUDGES = 10
+    DEFAULT_EVALUATION_MODE = EvaluationMode.BALANCED
 
     def __init__(
         self,
+        llm_factory: DefaultLLMFactory | None = None,
         counsel_llm: BaseChatModel | None = None,
         model: str | None = None,
         num_judges: int = DEFAULT_NUM_JUDGES,
         personas: list[str] | None = None,
         api_key: str | None = None,
         base_url: str | None = None,
+        evaluation_mode: EvaluationMode = DEFAULT_EVALUATION_MODE,
     ):
         """Initialize the Judge Counsel.
 
         Args:
+            llm_factory: Optional factory for creating LLMs.
             counsel_llm: Language model for judge workers. If provided, model,
                         api_key, and base_url are ignored.
             model: Model name for the counsel (default: gpt-5-nano-2025-08-07).
@@ -455,20 +498,22 @@ class JudgeCounsel:
                     OPENAI_API_KEY environment variables.
             base_url: Base URL for the API endpoint.
         """
+        self.llm_factory = llm_factory
         self.num_judges = num_judges
         self.personas = personas or DEFAULT_PERSONAS
-        self._model = model or self.DEFAULT_MODEL
+        self.evaluation_mode = evaluation_mode
+        self._model = model
         self._api_key = api_key
         self._base_url = base_url
 
-        if counsel_llm is None:
+        if counsel_llm is None and self.llm_factory is None:
             # Resolve API key from args or environment. If absent, defer initialization until evaluate().
             resolved_api_key = self._api_key or os.getenv("API_KEY") or os.getenv("OPENAI_API_KEY")
             resolved_base_url = self._base_url or os.getenv("MODEL_URL")
 
             if resolved_api_key:
                 counsel_llm = get_observed_llm(
-                    model=self._model,
+                    model=self._model or self.DEFAULT_MODEL,
                     api_key=resolved_api_key,
                     base_url=resolved_base_url,
                 )
@@ -485,6 +530,15 @@ class JudgeCounsel:
         if self.graph is not None and self.counsel_llm is not None:
             return
 
+        if self.llm_factory:
+            # Only pass model if explicitly provided; otherwise allow factory defaults/overrides
+            kwargs = {"name": "judge-counsel"}
+            if self._model:
+                kwargs["model"] = self._model
+            self.counsel_llm = self.llm_factory.get_llm(**kwargs)
+            self.graph = create_judge_counsel_graph(self.counsel_llm)
+            return
+
         resolved_api_key = self._api_key or os.getenv("API_KEY") or os.getenv("OPENAI_API_KEY")
         resolved_base_url = self._base_url or os.getenv("MODEL_URL")
 
@@ -495,9 +549,10 @@ class JudgeCounsel:
             )
 
         self.counsel_llm = get_observed_llm(
-            model=self._model,
+            model=self._model or self.DEFAULT_MODEL,
             api_key=resolved_api_key,
             base_url=resolved_base_url,
+            name="judge-counsel",
         )
         self.graph = create_judge_counsel_graph(self.counsel_llm)
 
@@ -531,6 +586,7 @@ class JudgeCounsel:
             "judge_votes": [],
             "final_decision": None,
             "deliberation_summary": "",
+            "evaluation_mode": self.evaluation_mode,
         }
 
         return cast(JudgeCounselState, cast(Any, self.graph).invoke(initial_state))
@@ -565,6 +621,7 @@ class JudgeCounsel:
             "judge_votes": [],
             "final_decision": None,
             "deliberation_summary": "",
+            "evaluation_mode": self.evaluation_mode,
         }
 
         return cast(JudgeCounselState, await cast(Any, self.graph).ainvoke(initial_state))

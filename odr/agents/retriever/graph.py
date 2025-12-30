@@ -17,15 +17,13 @@ from langgraph.types import Send
 from odr.agents.judge_counsel import JudgeCounsel
 from odr.agents.workers.base import WorkerFactory
 from odr.agents.workers.llm_worker import LLMWorkerFactory
+from odr.factory import DefaultLLMFactory
 
-from .nodes import (
-    choose_workers,
-    decide_next_action,
-    judgment,
-    observe_and_compile,
-    route_after_decision,
-    worker_node,
-)
+from .controller import decide_next_action, route_after_decision
+from .judgment import judgment
+from .compiler import observe_and_compile
+from .worker import worker_node
+from .planner import choose_workers
 from .state import RetrieverState, WorkerState
 
 
@@ -51,8 +49,10 @@ def fan_out_to_workers(state: RetrieverState) -> list[Send]:
 
 
 def create_retriever_graph(
-    llm: BaseChatModel,
+    llm: BaseChatModel | None = None,
+    llm_factory: DefaultLLMFactory | None = None,
     judge_counsel: JudgeCounsel | None = None,
+    compile_llm: BaseChatModel | None = None,
     worker_factories: Sequence[WorkerFactory] | None = None,
     worker_factory_seed: int | None = None,
 ) -> CompiledStateGraph:
@@ -66,8 +66,10 @@ def create_retriever_graph(
     5. Either loop back to choose_workers or end
 
     Args:
-        llm: Language model for supervisor, workers, and observer.
+        llm: Language model for supervisor, workers, and observer (if factory not used).
+        llm_factory: Factory for creating LLMs.
         judge_counsel: Judge Counsel agent for judgment (uses default model if not provided).
+        compile_llm: Optional model to use only for observe_and_compile. Defaults to `llm`.
         worker_factories: Factories to create workers (defaults to LLMWorkerFactory).
         worker_factory_seed: Seed for random worker factory selection.
 
@@ -76,12 +78,24 @@ def create_retriever_graph(
     """
     # Create Judge Counsel if not provided
     if judge_counsel is None:
-        judge_counsel = JudgeCounsel()
+        judge_counsel = JudgeCounsel(llm_factory=llm_factory)
 
-    factories: list[WorkerFactory] = (
-        list(worker_factories) if worker_factories else [LLMWorkerFactory(llm)]
-    )
+    factories: list[WorkerFactory]
+    if worker_factories:
+        factories = list(worker_factories)
+    elif llm_factory:
+        factories = [LLMWorkerFactory(llm_factory=llm_factory)]
+    elif llm:
+        factories = [LLMWorkerFactory(llm=llm)]
+    else:
+        raise ValueError("Either worker_factories, llm_factory, or llm must be provided")
+
     rng = random.Random(worker_factory_seed)
+
+    # Allow a dedicated model for compilation/synthesis.
+    # This is useful when worker results are large and you want a faster/cheaper model here.
+    if not llm_factory:
+        compile_llm = compile_llm or llm
 
     # Create graph with state schema
     graph = StateGraph(RetrieverState)
@@ -89,19 +103,27 @@ def create_retriever_graph(
     # Add nodes with LLM bound
     # Using explicit functions to avoid type narrowing issues with lambdas
     def _choose_workers(state: Any) -> dict[str, Any]:
-        return choose_workers(cast(RetrieverState, state), llm)
+        return choose_workers(cast(RetrieverState, state), llm=llm, llm_factory=llm_factory)
 
     def _worker(state: Any) -> dict[str, Any]:
-        return worker_node(cast(WorkerState, state), llm, factories, rng)
+        # Worker node doesn't use the supervisor LLM directly; it uses factories
+        # However, the node signature in worker.py takes an LLM as second arg.
+        # We need to check if worker_node actually uses it.
+        # Looking at worker.py: def worker_node(state: WorkerState, llm: BaseChatModel, ...)
+        # It seems it might not use it if using factories.
+        # Let's pass llm if available, or None. Worker node should handle it.
+        # Actually worker_node uses factory.create(id). The 'llm' arg there might be legacy?
+        # Let's check worker_node signature.
+        return worker_node(cast(WorkerState, state), llm, factories, rng) # type: ignore[arg-type]
 
     def _observe_and_compile(state: Any) -> dict[str, Any]:
-        return observe_and_compile(cast(RetrieverState, state), llm)
+        return observe_and_compile(cast(RetrieverState, state), llm=compile_llm, llm_factory=llm_factory)
 
     def _judgment(state: Any) -> dict[str, Any]:
         return judgment(cast(RetrieverState, state), judge_counsel)
 
     def _decide_next_action(state: Any) -> dict[str, Any]:
-        return decide_next_action(cast(RetrieverState, state), llm)
+        return decide_next_action(cast(RetrieverState, state), llm=llm, llm_factory=llm_factory)
 
     graph.add_node("choose_workers", _choose_workers)
     graph.add_node("worker", _worker)

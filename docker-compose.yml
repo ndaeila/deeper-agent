@@ -30,6 +30,15 @@ services:
       - LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID=${MINIO_ROOT_USER}
       - LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
       - LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE=true
+      # Media upload configuration (for screenshots/images from Browser Use vision)
+      # Internal endpoint (for server to connect to MinIO)
+      - LANGFUSE_S3_MEDIA_UPLOAD_ENABLED=true
+      - LANGFUSE_S3_MEDIA_UPLOAD_BUCKET=langfuse
+      - LANGFUSE_S3_MEDIA_UPLOAD_REGION=us-east-1
+      - LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT=http://localhost:9002
+      - LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID=${MINIO_ROOT_USER}
+      - LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
+      - LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE=true
       - NEXTAUTH_URL=${NEXTAUTH_URL}
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
       - SALT=${SALT}
@@ -80,6 +89,17 @@ services:
       - LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID=${MINIO_ROOT_USER}
       - LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
       - LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE=true
+      # Media upload configuration (for screenshots/images from Browser Use vision)
+      # Internal endpoint (for server to connect to MinIO)
+      - LANGFUSE_S3_MEDIA_UPLOAD_ENABLED=true
+      - LANGFUSE_S3_MEDIA_UPLOAD_BUCKET=langfuse
+      - LANGFUSE_S3_MEDIA_UPLOAD_REGION=us-east-1
+      - LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT=http://localhost:9002
+      - LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID=${MINIO_ROOT_USER}
+      - LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
+      - LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE=true
+      # Public endpoint (for external clients like Python SDK to upload media)
+      - LANGFUSE_S3_MEDIA_UPLOAD_PUBLIC_ENDPOINT=http://localhost:9002
       - SALT=${SALT}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
     restart: unless-stopped
@@ -160,9 +180,12 @@ services:
     depends_on:
       minio:
         condition: service_healthy
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
     entrypoint: >
       /bin/sh -c "
-      mc alias set myminio http://minio:9002 minioadmin minioadmin;
+      mc alias set myminio http://minio:9002 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD};
       mc mb myminio/langfuse --ignore-existing;
       exit 0;
       "

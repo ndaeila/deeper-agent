@@ -13,6 +13,9 @@ from odr.agents.types import WorkerResultExtended, WorkerTask
 from odr.agents.workers.base import WorkerFactory
 
 
+from odr.factory import DefaultLLMFactory
+
+
 class LLMResearchWorker:
     """A simple worker that uses a provided LLM to complete the assigned task."""
 
@@ -48,19 +51,19 @@ If you cannot verify a claim, explicitly mark it as unverified."""
             with_structured = getattr(self.llm, "with_structured_output", None)
             if callable(with_structured):
                 # Lazy import to avoid circular dependency
-                from odr.agents.retriever.contracts import WorkerFinding
+                from odr.agents.retriever.shared.contracts import WorkerFinding
 
                 try:
                     runner = cast(Any, with_structured(WorkerFinding, method="function_calling"))
                 except TypeError:
                     runner = cast(Any, with_structured(WorkerFinding))
-                wf = cast(WorkerFinding, cast(Any, runner).invoke(messages))
+                wf = cast(WorkerFinding, cast(Any, runner).invoke(messages, config={"run_name": f"worker:{task_typed['worker_id']}"}))
                 content = wf.findings
                 evidence = [e.model_dump() for e in wf.evidence]
             else:
                 raise RuntimeError("LLM does not support structured output")
         except Exception:
-            response = self.llm.invoke(messages)
+            response = self.llm.invoke(messages, config={"run_name": f"worker:{task_typed['worker_id']}"})
             content = response.content if isinstance(response.content, str) else str(response.content)
             evidence = []
 
@@ -84,10 +87,17 @@ class LLMWorkerFactory(WorkerFactory):
 
     worker_type = "llm"
 
-    def __init__(self, llm: BaseChatModel):
+    def __init__(self, llm_factory: DefaultLLMFactory | None = None, llm: BaseChatModel | None = None):
+        self.llm_factory = llm_factory
         self.llm = llm
+        if not self.llm_factory and not self.llm:
+            raise ValueError("Either llm_factory or llm must be provided")
 
     def create(self, worker_id: str) -> LLMResearchWorker:
-        return LLMResearchWorker(worker_id=worker_id, llm=self.llm)
+        if self.llm_factory:
+            llm = self.llm_factory.get_llm(name=f"worker:{worker_id}")
+        else:
+            llm = self.llm
+        return LLMResearchWorker(worker_id=worker_id, llm=llm)
 
 

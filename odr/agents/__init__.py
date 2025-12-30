@@ -17,6 +17,9 @@ from odr.agents.retriever import (
     WorkerTask,
     create_retriever_graph,
 )
+from odr.agents.paper_pipeline import DeepResearchPaper
+from odr.agents.paper_planner import PaperOutline, PaperPlanner, PaperSection
+from odr.agents.research_paper import ResearchPaperState, ResearchPaperWriter, create_research_paper_graph
 
 __all__ = [
     # Judge Counsel
@@ -38,4 +41,13 @@ __all__ = [
     "WorkerState",
     "WorkerTask",
     "create_retriever_graph",
+    # Paper planning / pipeline
+    "PaperPlanner",
+    "PaperOutline",
+    "PaperSection",
+    "DeepResearchPaper",
+    # Research paper writing (downstream from retrieval)
+    "ResearchPaperWriter",
+    "ResearchPaperState",
+    "create_research_paper_graph",
 ]

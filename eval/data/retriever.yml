@@ -1,0 +1,87 @@
+- task: find_nathan_daeila_blogs
+  description: |
+    Evaluate the retriever on its ability to find blogs written by Nathan Daeila.
+  cases:
+    - input: |
+        What blogs has Nathan Daeila written or been referenced in?
+      expected_output: |
+        Nathan Daeila has authored multiple posts on his personal site daeila.com and is listed in several internal pages as having written specific blog entries. Based on the findings:
+        - Authored posts on daeila.com (at least 5 clearly dated):
+          - Every Website Needs to be Redesigned (Again) for Agent Experience (AX) — February 5, 2025 — at https://www.daeila.com/blog/post-6/ (also the post contains a direct dated quote from that page).
+            Evidence excerpt: "Redesigning the internet for User Experience was hard enough - but humans aren’t the only users of the internet anymore. We may need to redesign every website, app, and service for the Consumer AI Assistants of 2030… I understand how this sounds like an overexaggeration, but it isn’t." — February 5, 2025
+          - Welcome to Woven World! — December 7, 2024 — (listed on the homepage of https://www.daeila.com/).
+            Evidence excerpt: Homepage listing: "Welcome to Woven World! — December 7, 2024 — by Nathan Daeila"
+          - What shape are your emotions? — February 1, 2024 — (listed on the homepage).
+            Evidence excerpt: Homepage listing: "What shape are your emotions? — February 1, 2024 — by Nathan Daeila"
+          - 100 Days of Learning Chinese: Product Breakdown of Duolingo — December 15, 2023 — (listed on the homepage).
+            Evidence excerpt: Homepage listing: "100 Days of Learning Chinese: Product Breakdown of Duolingo — December 15, 2023 — by Nathan Daeila"
+          - Oxygen - Fixing the Nursing Shortage — December 2, 2023 — (listed on the homepage).
+            Evidence excerpt: Homepage listing: "Oxygen - Fixing the Nursing Shortage — December 2, 2023 — by Nathan Daeila"
+          - Welcome to My Tech Blog Journey! — (listed on the homepage with date not shown in the excerpt).
+            Evidence excerpt: Homepage listing: "Welcome to My Tech Blog Journey! — date not shown in the page — by Nathan Daeila"
+
+        - Additional site structure evidence shows Nathan Daeila’s posts appear in other sections:
+          - The French page /fr/ explicitly calls Nathan Daeila’s Technical Blog and shows a snippet about the blog, establishing that he is the author on the site’s blog sections.
+            Evidence excerpt: from /fr/: "Technical Blog - Nathan Daeila" and "Daeila.com is a blog where Nathan Daeila posts articles about topics he cares about."
+          - The technology category page lists posts including Oxygen, confirming the author’s topics and posts on the site.
+            Evidence excerpt: from /categories/technology/: content mentioning Oxygen and Welcome to My Tech Blog Journey!
+
+        - Regarding external blogs or references: As of the gathered results, there are no clearly dated third-party blog posts that reference Nathan Daeila with quotes and dates. The material found is primarily from his own site. The collected notes indicate that external sources would be needed to meet a requirement for 5 unique external blogs with quotes and dates referencing him.
+          - Evidence notes: the page results discuss that external sources are needed and that the current data mainly shows dated posts on daeila.com; there is no set of external blogs with quoted references provided in the findings.
+
+        - Nathan Daeila’s article "Every Website Needs to be Redesigned (Again) for Agent Experience (AX)" was referenced by the site AgentExperience.ax, which discusses trends and milestones in agent-focused web development.
+          - Reference: AgentExperience.ax highlighted insights from Nathan Daeila’s post, including this summary: "Nathan Daeila’s provocative article on the necessity of redesigning for Agent Experience (AX) has sparked conversation across the agent developer community." — March 2025
+            Evidence excerpt: from https://agentexperience.ax/all/: "‘Every Website Needs to be Redesigned (Again) for Agent Experience (AX)’ by Nathan Daeila is a guiding post for many thinking about the future of web architecture in the age of AI. See daeila.com for the original."
+          
+        In short, Nathan Daeila has authored at least five clearly dated blog posts on his own site (and a few more listed on the homepage), but external blog references with quotes and dates have not been identified in the provided results, except for the mention on AgentExperience.ax which references his AX article.
+
+        Caveats: The search results come from the workers’ findings and include limited external sources. Some posts’ dates and titles appear in homepage lists rather than on individual post pages, and there may be additional posts not captured in the current data.
+
+        If you want, I can continue by searching for external blogs or social posts that quote or reference Nathan Daeila and extract at least 4 more external references with quotes and dates.
+
+        Sources cited (selected):
+        - https://www.daeila.com/ (home page listing posts with dates)
+        - https://www.daeila.com/blog/post-6/ (Every Website Needs to be Redesigned (Again) for Agent Experience (AX); date Feb 5, 2025; quote excerpt)
+        - https://www.daeila.com/fr/ (French technical blog page showing author attribution)
+        - https://www.daeila.com/categories/technology/ (Technology category page showing Nathan Daeila posts)
+        - https://www.daeila.com/categories/portfolio/ (Portfolio category page showing Nathan Daeila content)
+        - https://www.linkedin.com/posts/nathan-daeila_back-in-january-the-ceo-of-netlify-coined-activity-7299279819412803584-IbKk (LinkedIn reference URL surfaced in findings)
+        - https://agentexperience.ax/all/ (external blog referencing Nathan Daeila’s AX article)
+
+        Open questions:
+        - Which external blogs or outlets have referenced Nathan Daeila with quotes and dates? Can we identify 4+ external references with quotes and dates?
+        - Can we confirm exact publication dates for all posts listed on the homepage (e.g., Welcome to My Tech Blog Journey!) where the date is not visible in the excerpt?
+        - Are there additional posts on the site beyond those listed on the homepage or in the technology/portfolio pages that should be included?
+
+        Limitations:
+        - The data is limited to the provided worker findings; external blog references are not comprehensively identified. Quotas restricted further cross-site searching in this step, which may limit comprehensiveness.
+        - Some post dates are shown only on the homepage listing and may not be available on individual post pages in the extracted data. Some entries (e.g., Welcome to My Tech Blog Journey!) have undetermined dates in the visible data.
+        - Some results (e.g., quotes) are only available on the post pages themselves and require visiting those pages to extract precise quotes.
+
+        Claims (with evidence):
+        - [1] Every Website Needs to be Redesigned (Again) for Agent Experience (AX) was published on https://www.daeila.com/blog/post-6/ on February 5, 2025.
+        - https://www.daeila.com/blog/post-6/ ""Redesigning the internet for User Experience was hard enough - but humans aren’t the only users of the internet anymore. We may need to redesign every website, app, and service for the Consumer AI Assistants of 2030… I understand how this sounds like an overexaggeration, but it isn’t." — February 5, 2025"
+        - [2] Welcome to Woven World! is listed as a Nathan Daeila-authored post dated December 7, 2024 on the site homepage.
+        - https://www.daeila.com/ "Welcome to Woven World! — December 7, 2024 — by Nathan Daeila"
+        - [3] What shape are your emotions? is listed as a Nathan Daeila-authored post dated February 1, 2024 on the site homepage.
+        - https://www.daeila.com/ "What shape are your emotions? — February 1, 2024 — by Nathan Daeila"
+        - [4] 100 Days of Learning Chinese: Product Breakdown of Duolingo is listed as a Nathan Daeila-authored post dated December 15, 2023 on the site homepage.
+        - https://www.daeila.com/ "100 Days of Learning Chinese: Product Breakdown of Duolingo — December 15, 2023 — by Nathan Daeila"
+        - [5] Oxygen - Fixing the Nursing Shortage is listed as a Nathan Daeila-authored post dated December 2, 2023 on the site homepage.
+        - https://www.daeila.com/ "Oxygen - Fixing the Nursing Shortage — December 2, 2023 — by Nathan Daeila"
+        - [6] Welcome to My Tech Blog Journey! is listed on the homepage as a Nathan Daeila-authored post with no date shown in the excerpt.
+        - https://www.daeila.com/ "Welcome to My Tech Blog Journey! — date not shown in the page — by Nathan Daeila"
+        - [7] There are no clearly dated external blogs referencing Nathan Daeila in the current findings; external sources would be required to compile 5+ external references with quotes and dates.
+        - https://www.daeila.com/ "The content does not contain any quoted text attributed as quotes with dates; it only shows post titles with dates. These need to be supplemented with external blogs containing quoted references and dates."
+        - [8] A French-language page (/fr/) references Nathan Daeila as the author of a technical blog, confirming he maintains a personal blog section on the site.
+        - https://www.daeila.com/fr/ "Technical Blog - Nathan Daeila; Daeila.com is a blog where Nathan Daeila posts articles about topics he cares about."
+        - [9] The Technology category page lists Nathan Daeila's posts (e.g., Oxygen - Fixing the Nursing Shortage), confirming his topic areas and posts on the site.
+        - https://www.daeila.com/categories/technology/ "## Oxygen - Fixing the Nursing Shortage. In the heart of the University of Washington’s Annual DubHacks Hackathon, a seed of an idea took root..."
+        - [10] A LinkedIn post URL identified in the findings shows Nathan Daeila activity on social media, which may reference his work or be relevant in a broader context.
+        - https://www.linkedin.com/posts/nathan-daeila_back-in-january-the-ceo-of-netlify-coined-activity-7299279819412803584-IbKk "['{\'query\': \'Nathan Daeila blog\', \'follow_up_questions\': None, \'answer\': None, \'images\': [], \'results\': [{\'url\': \'https://www.daeila.com/fr/\', \'title\': \'Technical Blog - Nathan Daeila\', \'content\': \'Daeila.com is a blog where Nathan Daeila posts articles about topics he cares about.\', \'score\': 0.8900749, \'raw_content\': None}, {\'url\': \'https://www.daeila.com/categories/technology/\', \'title\': \'Technology - Nathan Daeila\', \'content\': \'## Oxygen - Fixing the Nursing Shortage. In the heart of the University of Washington’s Annual DubHacks Hackathon, a seed of an idea took root, stemmed from a global issue in healthcare that hits my family close to home. My name is Nathan Daeila, and along with my colleague Ben Price, we set out on a journey not just to develop an application but to create a meaningful solution to a critical problem facing our healthcare system: the nursing shortage. ## Welcome to My Tech Blog Journey! \'"
+        - [11] Nathan Daeila’s article on AX was referenced by AgentExperience.ax, a site following agent developer trends.
+        - https://agentexperience.ax/all/ "‘Every Website Needs to be Redesigned (Again) for Agent Experience (AX)’ by Nathan Daeila is a guiding post for many thinking about the future of web architecture in the age of AI. See daeila.com for the original."
+    # - input: |
+    #     Who is Nathan Daeila?
+    #   expected_output: |
+    #     The 

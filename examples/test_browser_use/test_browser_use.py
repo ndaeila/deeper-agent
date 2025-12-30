@@ -26,10 +26,11 @@ from odr.agents.types import WorkerTask
 def main():
     # Basic config - search tool disabled, visible browser
     config = BrowserUseWorkerConfig(
-        model="gpt-4o-mini",
+        model="gpt-5-nano",
         headless=False,  # Show the browser
         max_steps=10,
         use_search_tool=False,  # No Tavily/SerpApi needed
+        log_level="ERROR",
     )
 
     worker = BrowserUseWorker(worker_id="demo", config=config)

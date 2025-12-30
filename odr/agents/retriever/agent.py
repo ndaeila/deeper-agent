@@ -13,6 +13,8 @@ from langchain_core.language_models import BaseChatModel
 
 from odr.agents.judge_counsel import JudgeCounsel
 from odr.agents.workers.base import WorkerFactory
+from odr.agents.workers.llm_worker import LLMWorkerFactory
+from odr.factory import DefaultLLMFactory
 
 from .graph import create_retriever_graph
 from .state import RetrieverState
@@ -30,7 +32,7 @@ class Retriever:
         from langchain_openai import ChatOpenAI
         from odr.agents.judge_counsel import JudgeCounsel
 
-        llm = ChatOpenAI(model="gpt-4")
+        llm = ChatOpenAI(model="gpt-5-nano")
         # Optional: customize the Judge Counsel model
         counsel = JudgeCounsel()  # Uses default model
 
@@ -43,33 +45,62 @@ class Retriever:
 
     def __init__(
         self,
-        llm: BaseChatModel,
+        llm_factory: DefaultLLMFactory | None = None,
+        llm: BaseChatModel | None = None,
+        compile_llm: BaseChatModel | None = None,
         max_iterations: int = 3,
         max_workers: int = 2,
         judge_counsel: JudgeCounsel | None = None,
         worker_factories: Sequence[WorkerFactory] | None = None,
         worker_factory_seed: int | None = None,
+        recursion_limit: int = 100,
     ):
         """Initialize the Retriever agent.
 
         Args:
-            llm: Language model for supervisor, workers, and observer.
+            llm_factory: Factory for creating LLMs.
+            llm: Language model for supervisor, workers, and observer (deprecated if factory used).
+            compile_llm: Optional model to use only for observe_and_compile. Defaults to `llm`.
             max_iterations: Maximum number of retry iterations allowed.
             max_workers: Maximum number of workers per iteration (1-5, default 2 for browser workloads).
             judge_counsel: Judge Counsel agent for judgment.
                           Defaults to default model if not provided.
             worker_factories: Factories for creating workers (defaults to LLMWorkerFactory).
             worker_factory_seed: Seed for deterministic worker factory selection.
+            recursion_limit: Maximum number of graph steps allowed (default 100).
         """
-        self.llm = llm
+        self.llm_factory = llm_factory
+        
+        if self.llm_factory:
+            self.llm = self.llm_factory.get_llm(name="retriever-supervisor", provider="gemini")
+            self.compile_llm = self.llm_factory.get_llm(name="retriever-compiler", provider="gemini")
+        else:
+            self.llm = llm
+            self.compile_llm = compile_llm or llm
+
+        if not self.llm:
+             raise ValueError("Either llm_factory or llm must be provided")
+
         self.max_iterations = max_iterations
         self.max_workers = max_workers
-        self.judge_counsel = judge_counsel or JudgeCounsel()
-        self.worker_factories = worker_factories
+        self.judge_counsel = judge_counsel or JudgeCounsel(llm_factory=self.llm_factory)
+        
+        if worker_factories:
+             self.worker_factories = worker_factories
+        else:
+             # Default to LLM worker if none provided
+             if self.llm_factory:
+                  self.worker_factories = [LLMWorkerFactory(llm_factory=self.llm_factory)]
+             else:
+                  self.worker_factories = [LLMWorkerFactory(llm=self.llm)]
+        
         self.worker_factory_seed = worker_factory_seed
+        self.recursion_limit = recursion_limit
         self.graph = create_retriever_graph(
-            llm,
-            self.judge_counsel,
+            llm=self.llm,
+            llm_factory=self.llm_factory,
+            judge_counsel=self.judge_counsel,
+            compile_llm=self.compile_llm,
             worker_factories=self.worker_factories,
             worker_factory_seed=self.worker_factory_seed,
         )
@@ -103,7 +134,8 @@ class Retriever:
             Final state containing compiled output and all intermediate results.
         """
         initial_state = self._build_initial_state(input_text)
-        return cast(RetrieverState, self.graph.invoke(initial_state))
+        config = {"recursion_limit": getattr(self, "recursion_limit", 100)}
+        return cast(RetrieverState, self.graph.invoke(initial_state, config=config))
 
     async def arun(self, input_text: str) -> RetrieverState:
         """Execute the retriever workflow asynchronously.
@@ -115,7 +147,8 @@ class Retriever:
             Final state containing compiled output and all intermediate results.
         """
         initial_state = self._build_initial_state(input_text)
-        return cast(RetrieverState, await self.graph.ainvoke(initial_state))
+        config = {"recursion_limit": getattr(self, "recursion_limit", 100)}
+        return cast(RetrieverState, await self.graph.ainvoke(initial_state, config=config))
 
     def stream(self, input_text: str):
         """Stream the retriever workflow execution.
@@ -127,5 +160,6 @@ class Retriever:
             State updates as the graph progresses through nodes.
         """
         initial_state = self._build_initial_state(input_text)
-        yield from self.graph.stream(initial_state)
+        config = {"recursion_limit": getattr(self, "recursion_limit", 100)}
+        yield from self.graph.stream(initial_state, config=config)
 

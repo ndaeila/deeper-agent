@@ -1,0 +1,253 @@
+- task: find_nathan_daeila_blogs
+  description: |
+    Evaluate the retriever on its ability to find blogs written by Nathan Daeila.
+  cases:
+    - input: |
+        Who is Nathan Daeila?
+      expected_output: |
+        # Nathan Daeila: An OSINT Profile
+
+        Abstract
+        This OSINT-style profile synthesizes publicly available information about the individual named Nathan Daeila from a limited set of sources. The strongest evidence comes from his own site, which identifies him as a Product Manager, Technologist, and Creator and notes an affiliation with the University of Washington, Seattle, along with a portfolio/blog/Résumé. Additional corroboration exists in UW iSchool materials, LinkedIn, ZoomInfo, and a Pinterest variant, but these third-party sources include potential disambiguation with similarly named individuals. Several sources are behind authentication walls, limiting verifiable extraction. The findings therefore rely primarily on the subject’s own site and clearly attributed secondary sources, with cautions about identity disambiguation.
+
+        Background
+        - Original question: Who is Nathan Daeila?
+        - Core signal: A personal website (daeila.com) presents a professional identity and portfolio; UW iSchool materials mention mentoring at Hack for Social Good; LinkedIn and third-party directories provide additional, but sometimes ambiguous, signals of identity and professional activity.
+        - Disambiguation risk: Names with similar variants (e.g., Nate Daeila, Nathaniel Daeila) appear across Pinterest, ZoomInfo, and other directories, which may refer to different individuals or profiles.
+
+        Methodology
+        - Data sources used (deduplicated): 
+          - daeila.com (personal site) [1]
+          - UW iSchool article on Hack for Social Good (mentor Nathan Daeila) [2]
+          - LinkedIn profile (Nathan Daeila) [3]
+          - ZoomInfo entry referencing Nathan Daeila and LinkedIn [4]
+          - Pinterest profile (Nate Daeila) [5]
+          - LinkedIn authentication wall page (LinkedIn) [6]
+          - LinkedIn post (identity/scams context) [7]
+        - Approach: Extract direct quotes where available from provided evidence items, map each claim to its exact URL, and present a concise evidence table. Acknowledge limitations due to authentication walls and potential disambiguation.
+
+        Findings
+        Evidence Table
+        | Claim | Evidence excerpt | Source |
+        |---|---|---|
+        | Nathan Daeila is described by his own site as a Product Manager, Technologist, & Creator. | "Name: Nathan Daeila; Website: daeila.com; Title/role: Product Manager, Technologist, & Creator" | [1] |
+        | The same site lists an affiliation with the University of Washington, Seattle. | "Affiliation: University of Washington, Seattle" | [1] |
+        | The subject’s site indicates it contains a Portfolio, Blog, and Résumé. | "Website sections relevant to portfolio/blog: - Portfolio - Blog - R\u00e9sum\u00e9" | [1] |
+        | UW iSchool materials describe Nathan Daeila mentoring at Hack for Social Good. | "Informatics major and hackathon mentor Nathan Daeila said, “I’m excited for the chance to mentor high school and middle school students today because I get to help provide them the learning opportunity of how to make a positive impact on the world, the same way the iSchool has taught me.”" | [2] |
+        | A LinkedIn profile exists for Nathan Daeila. | "Nathan Daeila\nInformatics @ UW Seattle | Product Management, SWE, ML, & AI\nSeattle, Washington, United States\n500 connections, 1308 followers" | [3] |
+        | A ZoomInfo listing references Nathan Daeila and a LinkedIn profile; it suggests a professional identity and an AI/ML role. | "Nathan Daeila - AI and ML Engineer at T-Mobile; Nathan Daeila - AI/ML Infrastructure | LinkedIn" | [4] |
+        | There are name-variant profiles (Nate Daeila) on Pinterest that may refer to different individuals. | "Nate Daeila — Pinterest profile" | [5] |
+        | LinkedIn content exists but may be behind an auth wall; an example post references identity/scams. | "Nathan Daeila’s Post. 4o Image Generation was able to recreate a near-perfect replica of my own student ID..." | [7] |
+        | The LinkedIn auth wall page states it contains no information about "Nathan Daeila" without login. | "The provided page does not contain any information about \"Nathan Daeila.\" It appears to be a LinkedIn sign-up/login page content without any details related to that name." | [6] |
+
+        Citations
+        - [1] Daeila – Personal site https://www.daeila.com/
+        - [2] Kids get a taste of Informatics at Hack for Social Good https://ischool.uw.edu/news/2024/04/kids-get-taste-informatics-hack-social-good
+        - [3] Nathan Daeila – LinkedIn https://www.linkedin.com/in/nathan-daeila
+        - [4] Nathan Daeila – ZoomInfo https://www.zoominfo.com/p/Nathan-Daeila/5690947703
+        - [5] Nate Daeila – Pinterest https://www.pinterest.com/natedaeila/
+        - [6] LinkedIn auth wall page https://www.linkedin.com/authwall?trk=gf&trkInfo=AQFowjQ8m6smkwAAAZtJg7kAtOGbowIC0EUYDtnHuriuQ4mnjkRgRu4yVIOgrLYohwuSFhHMyi81r44DNvQxwpEzCC473SYvUyoVN21shl17ucBTb5oQbJlAx0Wu2Wwxh8PvzT8=&original_referer=&sessionRedirect=https%3A%2F%2Fwww.linkedin.com%2Fin%2Fnathan-daeila
+        - [7] Nathan Daeila’s Post - LinkedIn https://www.linkedin.com/posts/nathan-daeila_be-careful-everybody-scamming-and-identity-activity-7311137260303785985-k_PY
+
+        Discussion
+        - Reliability: The strongest, most direct information comes from the subject’s own site (claims of product manager/technologist/creator roles and UW Seattle affiliation) and UW iSchool coverage of Nathan Daeila as a mentor, which corroborates ongoing involvement with Informatics at UW. LinkedIn provides professional signals but content is often behind authentication, limiting verification in this context.
+        - Disambiguation: Multiple name variants appear (Nate Daeila, Nathaniel Daeila) in third-party sources, which complicates identity deducing. ZoomInfo also ties the name to an AI/ML role at a different company (T-Mobile) per the excerpt, which could indicate a separate or overlapping career path, or a different person with a similar name.
+        - Identity confidence: High for the core self-described identity on daeila.com; medium-high for UW affiliation (not independently corroborated by a UW page in the provided data); medium for LinkedIn signals due to auth constraints; low for some third-party variant profiles without corroborating detail.
+        - Gap: There is no independent, public university page confirming UW affiliation beyond the subject’s own site; further corroboration would strengthen the profile.
+
+        Limitations
+        - Access restrictions: LinkedIn pages and some profiles are authentication-protected, restricting verifiable extraction within this task.
+        - Potential name ambiguity: Disambiguation signals (Nate Daeila, Nathaniel Daeila) raise the possibility of multiple individuals; without additional corroboration, some claims may reflect different people.
+        - Scope: The evidence set relies on a limited number of URLs; there may be additional public sources not provided here that could add context or verify claims more robustly.
+
+        Open Questions
+        - Is “Nathan Daeila” a single individual with UW affiliation, or are there multiple people with the same/similar name across different platforms?
+        - Can UW-affiliation be independently verified via a UW-affiliated page or directory beyond the subject’s own site, within the provided dataset?
+        - How do the ZoomInfo entry and the LinkedIn content align with each other, and do they refer to the same person in the same timeframe?
+        - Are there additional credible public sources (beyond those provided) that confirm career history, projects, or mentorship roles?
+
+        References
+        1. https://www.daeila.com/ — Daeila – Personal site
+        2. https://ischool.uw.edu/news/2024/04/kids-get-taste-informatics-hack-social-good — Kids get a taste of Informatics at Hack for Social Good (UW iSchool)
+        3. https://www.linkedin.com/in/nathan-daeila — Nathan Daeila – LinkedIn
+        4. https://www.zoominfo.com/p/Nathan-Daeila/5690947703 — Nathan Daeila – ZoomInfo
+        5. https://www.pinterest.com/natedaeila/ — Nate Daeila – Pinterest
+        6. https://www.linkedin.com/authwall?trk=gf&trkInfo=AQFowjQ8m6smkwAAAZtJg7kAtOGbowIC0EUYDtnHuriuQ4mnjkRgRu4yVIOgrLYohwuSFhHMyi81r44DNvQxwpEzCC473SYvUyoVN21shl17ucBTb5oQbJlAx0Wu2Wwxh8PvzT8=&original_referer=&sessionRedirect=https%3A%2F%2Fwww.linkedin.com%2Fin%2Fnathan-daeila — LinkedIn auth wall page
+        7. https://www.linkedin.com/posts/nathan-daeila_be-careful-everybody-scamming-and-identity-activity-7311137260303785985-k_PY — Nathan Daeila’s Post (LinkedIn)
+
+    - input: |
+        What is Nathan Daeila's 
+      expected_output: |
+        Research Paper (Markdown):
+
+        # OSINT Outline: Identity and Public Footprint of Nathan Daeila
+
+        Abstract
+        This paper delineates a structured OSINT plan to identify, verify, and contextualize the public personae associated with the name Nathan Daeila, mapping biographical signals, professional footprint, online presence, and reputational context, while establishing rigorous reliability criteria and repeatable methodologies.
+
+        drafted sections
+        ## Basic Identity and Biographical Signals
+
+        Public signals identify a Nathan Daeila as a Seattle-area technology professional with ties to the University of Washington, Seattle. The primary self-descriptor appears on his personal site, which states: “Hello, I’m Nathan Daeila. Product Manager, Technologist, & Creator at the University of Washington, Seattle.” This site also positions Seattle/UW as the location/affiliation cue and hosts a portfolio/résumé section for a professional profile [https://www.daeila.com/] [https://www.daeila.com/portfolio/]. Evidence from the personal site anchors the core biographical claim and the career focus around product management, technology, and creator work [https://www.daeila.com/] [https://www.daeila.com/categories/portfolio/] [https://www.daeila.com/portfolio/] [45] [55] [50]. The same site hosts multiple blog posts with dated entries (e.g., February 2025 and December 2024) that illuminate project interests in technology and agent-centric experiences, reinforcing the public-facing biographical signal rather than a single employment record [https://www.daeila.com/blog/every-website-needs-to-be-redesigned-again-for-agent-experience-AX] [https://www.daeila.com/blog/welcome-to-woven-world] [https://www.daeila.com/blog/what-shape-are-your-emotions] [51] [52] [54].
+
+        Name variants appear across sources, with the core surname Daeila and multiple public references to “Nathan Daeila” alongside related spellings or nicknames such as “Nate Daeila.” LinkedIn and directory-style results list Nathan Daeila in the Seattle area and indicate an association with UW Seattle, while other public profiles show the surname across several listings, suggesting possible aliasing or multiple profiles with the same last name [https://www.linkedin.com/in/nathan-daeila] [https://www.linkedin.com/pub/dir/+/Daeila] [https://www.linkedin.com/in/nathan-daeila] [66] [9]. There is also an athletics-oriented entry for “Nate Daeila” in Washington Track & Field, signaling a name variant in a context that could be a different person or an earlier usage of the name [https://www.athletic.net/athlete/12905755/track-and-field] [42]. Taken together, the retrieval supports a primary identity core centered on Nathan/Nate Daeila, with aliases and variants appearing in public listings [42] [66] [9].
+
+        Geographic and professional footprints are corroborated by multiple public signals. LinkedIn profiles place Nathan Daeila in Seattle with an Informatics/ UW Seattle affiliation, and personal site content reinforces Seattle as the location with UW Seattle ties [https://www.linkedin.com/in/nathan-daeila] [45] [66]. Independent bios and public employer signals further sketch a career path within AI/ML and product-oriented roles; third-party aggregators list AI/ML engineering roles in the Seattle/Bellevue area (for example, T-Mobile) tied to Nathan Daeila, though such employer signals vary across sources and are not uniformly corroborated by a single, definitive timeline [https://www.zoominfo.com/p/Nathan-Daeila/5690947703] [https://rocketreach.co/nathan-daeila-email_403393211] [5] [31]. The public blog and portfolio presence on the personal site also accompany the identity, with a professional navigation that includes Portfolio and Réssumé, underscoring a public-facing, multi-platform identity footprint beyond a single employer record [https://www.daeila.com/; https://www.daeila.com/categories/portfolio/] [45] [55]. Blog entries dated in late 2024 and early 2025 reflect ongoing activity and topical focus in technology and agent-oriented product work [https://www.daeila.com/blog/welcome-to-woven-world] [https://www.daeila.com/blog/every-website-needs-to-be-redesigned-again-for-agent-experience-AX] [52] [51].
+
+        ## Professional Footprint and Career Trajectory
+
+        Based on the retrieved materials, Nathan Daeila appears to be a Seattle-based technology professional who publicly frames himself as a Product Manager, Technologist, and Creator. The strongest public signals come from his own site, where the homepage presents him with those exact titles, and the About page explicitly identifies him as a Product Manager and an iSchool student associated with the University of Washington, Seattle [4][49].
+
+        The About page also documents early-career signals consistent with a tech- and data-oriented path: it notes backgrounds such as an IT intern during a global chip shortage, experience as a Systems Administrator, and internships at Jamf and the Pacific Northwest National Laboratory (PNNL) [49]. Taken together, these elements suggest a foundation in IT, cybersecurity, and data-oriented work prior to more product/technology-focused roles.
+
+        In terms of project focus and domain, the site references Oxygen — Fixing the Nursing Shortage — indicating engagement with healthcare-technology initiatives, alongside a broader portfolio that covers AI, healthcare, UX, and data visualization. The blog/portfolio entries, including items like “Oxygen — Fixing the Nursing Shortage” and “100 Days of Learning Chinese,” point to interests spanning AI, technology, product development, and human-centered design [4][50].
+
+        Public professional signals from third-party sources are more limited due to access restrictions. A public LinkedIn post is cited as announcing acceptance of an offer to join Expedia Group as a Product Management Intern, which would indicate a further step in product-management-focused work, subject to independent corroboration [77]. The LinkedIn profile itself lists UW Seattle Informatics and a focus on Product Management, software engineering, ML, and AI, though much of LinkedIn content is behind authentication walls, limiting full verification of details from this OSINT workflow [66][63]. ZoomInfo likewise restricts access to the public, limiting cross-source corroboration from that channel [98].
+
+        ## Online Presence and Public Communications
+
+        Public footprint includes at least one identifiable Nathan Daeila in the context of the University of Washington: an Informatics student who acted as a Hack for Social Good mentor per the UW iSchool article Kids get a taste of Informatics at Hack for Social Good [23]. A publicly accessible LinkedIn profile lists Nathan Daeila as an AI/ML Infrastructure professional at UW Seattle [66]. Additional anchors include a WayUp profile [96] and an archived UW author page on the UW site [34], while a public Twitter/X presence appears under the handle nathanjd_ with activity dating back to 2018 [38].
+
+        Across social platforms, the primary public presence appears to be Twitter/X under nathanjd_ [38]. However, searches surface other similarly named accounts (e.g., DavilaPedregon [35], zolker_hga [39], NathanDaniel32 [36], _Nathan_Daniel [37]), which raises name-confusion risk and complicates attribution to the UW Nathan Daeila [38].
+
+        External identifiers anchor identity across platforms: LinkedIn provides an identity scaffold (https://www.linkedin.com/in/nathan-daeila) [66], and LinkedIn activity such as a post referencing the Netlify CEO and a short link (https://lnkd.in/gq-NfakR) illustrate ongoing professional engagement [73][24]. Domain-specific signals are reinforced by the iSchool article (mentorship role) and WayUp profile (career context) [23][96], with institutional signals also appearing via the UW author page (though it is archived) [34].
+
+        Limitations and attribution challenges remain: LinkedIn access may be gated behind authentication, limiting independent verification [66], the UW author page is archived with limited metadata [34], and the presence of multiple similarly named individuals creates impersonation risk and complicates definitive attribution across platforms [38].
+
+        ## Geographic Footprint, Affiliations, and Reputation
+
+        Public signals consistently place Nathan Daeila in the Seattle metropolitan area, with explicit location cues pointing to Seattle, WA (current) and Bellevue, WA as part of his base of operations in the Puget Sound region. This geographic footprint is corroborated by multiple OSINT aggregators that list Seattle/Bellevue as his locale, including RocketReach and ZoomInfo entries. The RocketReach listing notes a Seattle, WA current footprint, while ZoomInfo describes him as an AI/ML Engineer based in Bellevue, Washington. [30][20]
+
+        In terms of professional roles, the current designation repeatedly appears as AI/ML Engineer at T-Mobile, with corroborating phrasing across ZoomInfo and RocketReach biographies. ZoomInfo explicitly states the Bellevue-based AI/ML Engineer role, and RocketReach likewise identifies him as AI/ML Engineer in the Seattle/Bellevue area. Additional public records outline a broader career trajectory that includes a Systems Administrator role at Aegis Living and various early- to mid-career technical positions, alongside an education credential from the University of Washington. Cross-checks with Crunchbase also surface Nathan Daeila in publicly accessible profiles. [20][30][44]
+
+        Affiliations and ecosystem involvement extend beyond a single employer. The subject is associated with the Innomatai ecosystem, with InnoMat.AI LinkedIn presence and Crunchbase references indicating activity within that software/startup network. Public UW iSchool coverage mentions Nathan Daeila as a hackathon mentor (Hack for Social Good), reflecting positive academic- and community-facing reputation signals. Public LinkedIn presence further documents his Seattle-based professional footprint, while a personal portfolio site and GitHub repository provide evidence of technical work and project activity. [64][62][23][66][4][20]
+
+        Overall, the available public traces paint a professional profile centered in the Seattle area, with a tech- and AI/ML-focused career arc, and with affiliations spanning startup ecosystems and academic/community activities. The tone of sources is professional and constructive, with no credible legal actions or controversies identified in the accessible materials. However, as with many OSINT inquiries of this type, reliability varies by source, and some items (e.g., directory-like listings or auth-protected profiles) require careful cross-verification to minimize identity ambiguity. [23][66][20][4][62]
+
+        ## Methodology, Verification, and Limitations
+
+        The section follows a repeatable OSINT workflow designed to validate identity claims about Nathan Daeila. Core steps include defining the specific identity claims to verify (name, public footprint, roles, affiliations), gathering multiple independent sources per claim, applying a credibility rubric (authoritativeness, recency, corroboration), and requiring triangulation across sources for critical facts. Data captures are timestamped and contextualized, uncertainties are documented, and conclusions are accompanied by an evidence log and assigned confidence levels. When conflicts arise, the approach documents reconciliations and clearly labels unresolved items as unverified with recommended next steps.
+
+        Evidence signals leveraged in the synthesis include primary signals from university-affiliated materials and public professional profiles, complemented by public directories and governance-oriented guidance. The executive synthesis notes Nathan Daeila appears in a university-related event context (as a mentor with an Informatics focus) and is linked to a UW Seattle affiliation through public LinkedIn profiles, while a public directory provides contact details. These signals are triangulated alongside OSINT governance references and privacy considerations to frame reliability and handling.
+
+        Credibility evaluation follows a hierarchical logic: primary authoritative sources (e.g., university materials) are given higher weight for education and program affiliations, with public profiles (such as LinkedIn) providing corroboration subject to platform dynamics. Public directories are used cautiously due to potential inaccuracies. The OSINT workflow and governance context are anchored by recognized guideline bodies and frameworks that emphasize source credibility, data handling, timestamping, and conflict resolution, which frame how evidence is collected, logged, and reported in this inquiry.
+
+        Conflicts and reconciliation are explicitly acknowledged. The strongest identity signals stem from a university-affiliated source and LinkedIn profiles; ancillary sources (e.g., public directories) are supportive but not definitive on their own. The current state highlights the need for a third independent primary source to strengthen triangulation and reduce residual uncertainty, given access limitations to certain platforms that hinder independent verification.
+
+        Privacy, ethics, and limitations play a central role in presenting findings. Public OSINT collection should respect privacy boundaries and rely on information that is publicly available, with attention to data handling and potential privacy risks. Notable limitations include access controls on professional networks (auth-restricted content), the possibility of name confusion or misattribution, and time-sensitive data that may not reflect current roles. The reporting standard calls for timestamped quotes, explicit citations, cross-source corroboration, and assigned confidence levels, with conflicts documented and unresolved items clearly flagged for follow-up. Deliverables referenced in the retrieval packet include an OSINT workflow template and a sample Nathan Daeila entry, illustrating the repeatable structure intended for future identity-verification tasks.
+
+        Limitations
+        - Data access and platform restrictions (e.g., gated LinkedIn content, paywalls, or API limitations) hinder complete, independent triangulation.
+        - Name ambiguity and potential aliasing across profiles can produce attribution noise and impersonation risk.
+        - Time-sensitivity: roles, affiliations, and public activity can change; some signals may be outdated or archived.
+        - Public-record signals vary in reliability and may be incomplete or inconsistent across sources.
+        - Some links in the references are placeholders or non-definitive sources; verification may require access to internal or gated materials.
+
+        Open Questions
+        - Can a third independent primary source be located to strengthen triangulation of key identity claims (e.g., a verifiable university record, official employment announcement, or a conference program listing)?
+        - Are there additional public signals (public speech, publications, or conference participation) that corroborate the career focus and affiliations?
+        - How might language barriers or regional data restrictions affect the completeness of the biographical signal set?
+        - Are there any credible reports of disputes or misattribution that require focused verification and disambiguation?
+
+        References
+        1. https://aiinstitutes.org/wp-content/uploads/AI-Magazine-Spring-2024-NSFs-National-AI-Institutes.pdf
+        2. https://blackbird.ai/blog/osint-intelligence/
+        3. https://blog.mcafeeinstitute.com/open-source-intelligence-osint-essential-guide-for-intelligence-investigations-and-law-enforcement/
+        4. https://daeila.com
+        5. https://daeila.com/
+        6. https://duckduckgo.com/?q=Nathan+Daeila+current+role+OR+job+title+OR+employer+OR+organization
+        7. https://duckduckgo.com/?q=Nathan+Daeila+current+role+OR+job+title+OR+employer+OR+organization&ia=web
+        8. https://duckduckgo.com/?q=Nathan+Daeila+location+OR+city+OR+whereabouts
+        9. https://duckduckgo.com/?q=Nathan+Daeila+location+OR+city+OR+whereabouts&ia=web
+        10. https://ec.europa.eu/info/law/law-topic/data-protection/reform/rules-business-and-organisations/oblig
+        11. https://edps.europa.eu/press-publications/press-news/blog/pseudonymous-data-processing-personal-d
+        12. https://en.wikipedia.org/wiki/Open-source_intelligence
+        13. https://example.com/source1
+        14. https://example.net/source3
+        15. https://example.org/a
+        16. https://example.org/b
+        17. https://example.org/c
+        18. https://example.org/profile
+        19. https://example.org/source2
+        20. https://github.com/ndaeila
+        21. https://hakin9.org/authenticity-verification-of-findings-in-osint-tools-to-ensure-data-credibility/
+        22. https://insightops.com.ua/en/2025/08/26/the-verification-triangle-in-osint-how-to-distinguish-facts-from-manipulation/
+        23. https://ischool.uw.edu/news/2024/04/kids-get-taste-informatics-hack-social-good
+        24. https://lnkd.in/gWJZUzYy
+        25. https://lnkd.in/gq-NfakR
+        26. https://medium.com/@efim.lerner/what-are-the-5-steps-of-osint-%EF%B8%8F-%EF%B8%8F-111f5a061008
+        27. https://mhl.org/sites/default/files/newspapers/LAM-1882-12.pdf
+        28. https://obsint.eu/wp-content/uploads/2023/04/Guidelines-for-Open-Source-Intelligence-Organisations.pdf
+        29. https://repositories.lib.utexas.edu/bitstreams/3723ccb3-289d-48db-9112-395b380f528a/download
+        30. https://rocketreach.co/it/email-e-telefono-d%C3%AC-nathan-daeila_403393211
+        31. https://rocketreach.co/nathan-daeila-email_403393211
+        32. https://shadowdragon.io/blog/osint-techniques/
+        33. https://sip-international.com/blog/what-is-open-source-intelligence-osint/
+        34. https://sites.uw.edu/ndaeila/author/ndaeila/
+        35. https://twitter.com/DavilaPedregon
+        36. https://twitter.com/NathanDaniel32
+        37. https://twitter.com/_Nathan_Daniel
+        38. https://twitter.com/nathanjd_
+        39. https://twitter.com/zolker_hga
+        40. https://www
+        41. https://www.answers.com/history-ec/was_ian_nathaniel_mushrush_a_viking
+        42. https://www.athletic.net/athlete/12905755/track-and-field
+        43. https://www.crowdstrike.com/en-us/cybersecurity-101/threat-intelligence/open-source-intelligence-osint/
+        44. https://www.crunchbase.com/organization/nathan-daeila
+        45. https://www.daeila.com
+        46. https://www.daeila.com#post
+        47. https://www.daeila.com/
+        48. https://www.daeila.com/about
+        49. https://www.daeila.com/about/
+        50. https://www.daeila.com/blog/100-days-of-learning-chinese
+        51. https://www.daeila.com/blog/every-website-needs-to-be-redesigned-again-for-agent-experience-AX
+        52. https://www.daeila.com/blog/welcome-to-woven-world
+        53. https://www.daeila.com/blog/wh
+        54. https://www.daeila.com/blog/what-shape-are-your-emotions
+        55. https://www.daeila.com/categories/portfolio/
+        56. https://www.daeila.com/categories/technology/
+        57. https://www.facebook.com/groups/193905485008534/posts/1474535120278891/
+        58. https://www.facebook.com/groups/904744240967026/posts/1553317456109698/
+        59. https://www.fastpeoplesearch.com/manvash-daeila_id_G-6991706680987048488
+        60. https://www.fivecast.com/blog/source-validation-a-critical-step-in-osint-investigations/
+        61. https://www.imperva.com/learn/application-security/open-source-intelligence-osint/
+        62. https://www.innomatai.com/\Crunchbase
+        63. https://www.linkedin.com/authwall?trk=gf&trkInfo=AQGs9wT3og98EgAAAZtKXdEI4yD12utgH7vMRZNv4GRucpeVvpICi3kw3vkztdLcfDSCgUxYR66CDOKbigQjHu1mVPhwEKL3TVSd9aXuDx-wLIgmHYiiHeDH-A6xV78cOD_zxw0=&original_referer=&sessionRedirect=https%3A%2F%2Fwww.linkedin.com%2Fin%2Fnathan-daeila
+        64. https://www.linkedin.com/company/innomatai
+        65. https://www.linkedin.com/company/innomatai\\Industry:\\Software
+        66. https://www.linkedin.com/in/nathan-daeila
+        67. https://www.linkedin.com/in/nathan-daeila%7D%7D
+        68. https://www.linkedin.com/in/nathan-daeila%7D%7D,%7B%22navigate%22:%7B%22url%22:%22https://www.zoominfo.com/p/Nathan-Daeila/5690947703%22%7D%7D,%7B%22extract%22:%7B%22query%22:%22Nathan%20Daeila%20LinkedIn%20OR%20ZoomInfo%20OR%20Nathan%20Daeila%20blog%22,%22extract_links%22:true,%22start_from_char%22:0%7D%7D]%7D%20%7D%60%60%60json%7B?_l=en_US
+        69. https://www.linkedin.com/in/nathan-daeila-
+        70. https://www.linkedin.com/posts/a16z-bio-health_as-out-of-pocket-healthcare-spending-hits-activity-7323451102169833474-VZJc
+        71. https://www.linkedin.com/posts/addyosm
+        72. https://www.linkedin.com/posts/addyosmani_programming-softwareengineering-ai-activity-7315984408761520128-72ln
+        73. https://www.linkedin.com/posts/nathan-daeila_back-in-january-the-ceo-of-netlify-coined-activity-7299279819412803584-IbKk
+        74. https://www.linkedin.com/posts/nathan-daeila_be-careful-everybody-scamming-and-identi
+        75. https://www.linkedin.com/posts/nathan-daeila_be-careful-everybody-scamming-and-identity-activity-7311137260303785985-k_PY
+        76. https://www.linkedin.com/posts/nathan-daeila_i-am-ecstatic-to-share-tha
+        77. https://www.linkedin.com/posts/nathan-daeila_i-am-ecstatic-to-share-that-i-have-accepted-activity-7178775282936418305-G7x-
+        78. https://www.linkedin.com/posts/nathan-daeila_theme-resonance-activity-7314831274869673984-hRuY
+        79. https://www.linkedin.com/pub/dir/+/Daeila
+        80. https://www.linkedin.com/pulse/commercial-open-source-intelligence-age-data-privacy-tadaweb-2yzke
+        81. https://www.moodys.com/web/en/us/insights/compliance-tprm/open-source-intelligence-osint-types-tools-and-methods.html
+        82. https://www.neotas.com/osint-tools-and-techniques/
+        83. https://www.penlink.com/blog/best-practices-for-integrating-osint-into-investigations/
+        84. https://www.pinterest.com/natedaeila/
+        85. https://www.recordedfuture.com/threat-intelligence-101/intelligence-sources-collection/osint-framework
+        86. https://www.rsl.ltd/exploring-open-source-intelligence-osint-insights-from-our-recent-webinar/
+        87. https://www.sans
+        88. https://www.sans.org/blog/what-is-open-source-intelligence
+        89. https://www.sans.org/blog/what-is-open-source-intelligence-
+        90. https://www.sans.org/blog/what-is-open-source-intelligenceThese
+        91. https://www.semanticscholar.org/paper/Systematically-Searching-for-Identity-Related-in-Walkow-P%C3%B6hn/7cd41672f06e612d0d2990e62c6cc69b37c1861c
+        92. https://www.sosintel.co.uk/osint-and-ethics-navigating-the-challenges-of-responsible-intelligence-gathering/
+        93. https://www.truepeoplesearch.com/find/person/pxllll49l0n4ul0r0n468
+        94. https://www.ussearch.com/people-search/arash-daeila/
+        95. https://www.vaadata.com/blog/cybersecurity-osint-methodology-tools-and-techniques/
+        96. https://www.wayup.com/profile/Nathan-Daeila-79b3955b67/
+        97. https://www.yumpu.com/en/document/view/19843341/shootings-rock-lake-sammamish-state-park-sammamish-review
+        98. https://www.zoominfo.com/p/Nathan-Daeila/5690947703
+        99. https://www.zoominfo.com/p/Nathan-Daeila/5690947703%22%7D%7D
+        100. https://www.zoominfo.com/p/Nathan-Daeila/5690947703Note:
+        101. https://x.com/nathanjd_

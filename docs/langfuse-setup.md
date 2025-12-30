@@ -27,7 +27,7 @@ Create a `.env` file in your project or `examples/test_retriever/` directory:
 
 ```bash
 # Model Configuration
-MODEL_NAME=gpt-4
+MODEL_NAME=gpt-5-nano
 MODEL_URL=https://api.openai.com/v1
 API_KEY=sk-your-api-key-here
 

@@ -17,13 +17,20 @@ import asyncio
 import inspect
 import os
 import re
+import time
 from dataclasses import dataclass
 from importlib.util import find_spec
 from typing import Any, Mapping, cast
 
 from odr.agents.types import WorkerResultExtended, WorkerTask
 from odr.agents.workers.base import WorkerFactory
+from odr.factory import DefaultLLMFactory
 from odr.tools.search import search_for_links, search_provider_available
+
+
+# ================================
+# Install hints and warnings
+# ================================
 
 
 _WARNED_KEYS: set[str] = set()
@@ -72,12 +79,15 @@ def _preflight_print_hints(need_search: bool = True) -> None:
 def _require_browser_use() -> Any:
     try:
         from browser_use import Agent, Browser, Tools  # type: ignore[import-not-found]
-        from browser_use.llm import ChatOpenAI as BrowserUseChatOpenAI  # type: ignore[import-not-found]
     except ImportError as e:  # pragma: no cover
         raise ImportError(_INSTALL_HINT) from e
 
-    return Agent, Browser, Tools, BrowserUseChatOpenAI
+    return Agent, Browser, Tools
 
+
+# ================================
+# Worker configuration
+# ================================
 
 @dataclass(frozen=True)
 class BrowserUseWorkerConfig:
@@ -86,19 +96,32 @@ class BrowserUseWorkerConfig:
     model: str = "gpt-5-nano-2025-08-07"
     reasoning_effort: str = "low"
     headless: bool = False
+    use_vision: bool | str = "auto"  # Vision mode: "auto" (default), True (always), False (never)
+    log_level: str = "WARNING"  # Log level for Browser Use: DEBUG, INFO, WARNING, ERROR, CRITICAL
     tavily_max_results: int = 5
     max_steps: int = 15  # Hard limit on browser agent steps
     max_actions: int = 15  # Some browser_use versions use this instead
     use_search_tool: bool = True  # Set False to disable Tavily/SerpApi search tool
+    # Guardrails for Tavily/SerpApi spend: browser_use should search once, then browse/extract.
+    max_search_calls: int = 1
+    max_search_queries_per_call: int = 3
+    # Bound how much history we keep in-memory / event bus payloads.
+    max_history_chars: int = 30000
+    max_raw_history_chars: int = 200000
 
+
+# ================================
+# Worker implementation
+# ================================
 
 class BrowserUseWorker:
     """A worker that uses Tavily + browser_use for evidence collection."""
 
     worker_type = "browser_use"
 
-    def __init__(self, worker_id: str, config: BrowserUseWorkerConfig | None = None):
+    def __init__(self, worker_id: str, llm_factory: DefaultLLMFactory, config: BrowserUseWorkerConfig | None = None):
         self.worker_id = worker_id
+        self.llm_factory = llm_factory
         self.config = config or BrowserUseWorkerConfig()
 
     def run(self, task: Mapping[str, Any], input_text: str, iteration: int) -> WorkerResultExtended:
@@ -134,21 +157,58 @@ class BrowserUseWorker:
         return asyncio.run(self._run_async(task=task, input_text=input_text, iteration=iteration))
 
     async def _run_async(self, task: WorkerTask, input_text: str, iteration: int) -> WorkerResultExtended:
-        Agent, Browser, Tools, BrowserUseChatOpenAI = _require_browser_use()
+        start_time = time.perf_counter()
+        Agent, Browser, Tools = _require_browser_use()
 
         api_key = os.getenv("OPENAI_API_KEY") or os.getenv("API_KEY")
         if not api_key:
             raise RuntimeError("Missing OPENAI_API_KEY (or API_KEY) for browser_use ChatOpenAI")
 
+        req = task.get("requirements") if isinstance(task.get("requirements"), dict) else {}
+        max_search_calls = self.config.max_search_calls
+        max_search_queries_per_call = self.config.max_search_queries_per_call
+        max_steps = self.config.max_steps
+        max_actions = self.config.max_actions
+        if isinstance(req.get("max_search_calls"), int):
+            max_search_calls = int(req["max_search_calls"])
+        if isinstance(req.get("max_search_queries_per_call"), int):
+            max_search_queries_per_call = int(req["max_search_queries_per_call"])
+        if isinstance(req.get("max_steps"), int):
+            max_steps = int(req["max_steps"])
+        if isinstance(req.get("max_actions"), int):
+            max_actions = int(req["max_actions"])
+
         tools: Any = None
-        if self.config.use_search_tool:
+        # Enable search tool only if configured AND the per-task budget allows it.
+        if self.config.use_search_tool and max_search_calls > 0:
             tools = Tools()
+            search_budget = _SearchBudget(
+                max_calls=max(0, int(max_search_calls)),
+                max_queries_per_call=max(1, int(max_search_queries_per_call)),
+            )
 
             @tools.action(
-                description="Initial web search for relevant links using multiple queries at once."
+                description="Initial bulk web search for relevant links using multiple queries at once."
             )
             async def do_search(queries: list[str]) -> str:
-                return search_for_links(queries=queries, max_results=self.config.tavily_max_results)
+                normalized = _normalize_search_queries(queries)
+                accepted, status = search_budget.consume(normalized)
+                if status == _SearchStatus.BLOCKED:
+                    # The prompt tells the agent to STOP when quota is exhausted; reinforce here.
+                    return (
+                        "SEARCH_QUOTA_EXHAUSTED: `do_search` is only allowed once for this task. "
+                        "Do NOT call `do_search` again. Proceed by opening 1-2 URLs from the previous "
+                        "results (if any), extract facts with citations, then call done()."
+                    )
+                if not accepted:
+                    return (
+                        "NO_VALID_QUERIES: Provide 1-3 short, distinct queries (strings). "
+                        "Then proceed to open 1-2 result URLs and extract facts with citations."
+                    )
+                return search_for_links(
+                    queries=accepted,
+                    max_results=self.config.tavily_max_results,
+                )
 
         browser = Browser(headless=self.config.headless)
         llm_kwargs: dict[str, Any] = {
@@ -158,13 +218,18 @@ class BrowserUseWorker:
         # Some browser_use versions support reasoning_effort; keep best-effort compatibility.
         if self.config.reasoning_effort:
             llm_kwargs["reasoning_effort"] = self.config.reasoning_effort
-        llm = BrowserUseChatOpenAI(**llm_kwargs)
+        # Use Langfuse-wrapped LLM if observability is enabled
+        
+        llm = self.llm_factory.get_browser_use_llm(name="browser-use-worker", **llm_kwargs)
 
-        # Build a short task description without URLs to avoid browser_use auto-navigating
-        # (it parses URLs from the task string and skips search).
-        base_q = task["task_description"]
+        
 
-        # Extract deliverables from context if present (simple heuristic).
+        # ================================
+        # Prompt Sections
+        # ================================
+        base_q = task["task_description"]  # ← Usually: from choose_workers LLM (nodes.py)
+
+        # Extract deliverables from context if present.
         deliverables_section = ""
         ctx = task.get("context") or ""
         if "Deliverables:" in ctx:
@@ -174,22 +239,59 @@ class BrowserUseWorker:
                 end = len(ctx)
             deliverables_section = ctx[start:end].strip()
 
+        workflow = (
+            "1. First, call `do_search` one time with short query parameters you would use to search for the given topic. Do not overuse this tool.\n"
+            "2. Read the returned context and use it to guide what sites you open and what information you extract.\n"
+            "3. Then, using the browser, dig deeply into the sites you opened and extract the information you need.\n"
+            "4. Stop and return findings with cited URLs.\n\n"
+
+            "Advice (you don't have to follow these, but they may help you):\n"
+            "Go deeper on the same domain to find more information about the subject.\n"
+            "This means instead of skimming the surface of the first page, you should go deeper on the same domain when possible to find more information about the subject.\n"
+            "Leverage the results from do_search to guide your browsing. They pull results like if you were searching on Google for the given topic. Oftentimes the answer can be found directly in the search result before going into the website, so you should use them to guide your browsing.\n"
+            "Sometimes if a domain is relevant enough to the entity you're investigating, you should try to find more information about the entity on that domain.\n"
+            "One example of this is if you're investigating a person, you can visit their blog or their school/institution/company's website and navigate through relevant pages to find more information about the entity.\n"
+            "Sometimes, there is even a search bar on the page you can explore. Other times, you may see your entity is related to some other institution or organization, so you can use general search to find other websites so you can explore that affiliation further.\n"
+            "Your choice. Just make sure you're looking as deep as possible into the entity you're investigating, including their other attributes, connnections, relationships and affiliations.\n\n"
+            # "WORKFLOW (follow this order):\n"
+            # "1. If web search is available, use it at most ONCE to find the best primary/official seed URLs.\n"
+            # "   If web search is not available, reuse URLs already present in the task context.\n"
+            # "2. Open relevant seed URLs and explore deeper by following internal links and buttons on that same page (or same domain).\n"
+            # "3. Based on the possible relevance of a page you visit, deeply research specific facts/quotes/connections within the same domain to see if there is more to learn from the deeper pages.\n"
+            # " - For instance, if you are investigating a person, their Twitter is relevant, but the entirety of the Twitter website should not be explored in depth. "
+            # "   However, if you are investigating their workplace or school/institution, or even their blog or city of residence, you should explore that domain in depth."
+            # "4. Stop and return findings with cited URLs.\n\n"
+        )
+        nav_constraint = (
+            "- You can navigate to URLs present in the task/context and follow same-domain links.\n"
+            "- Prefer going deeper on the same domain over adding new domains, unless you see another very relevant domain to your focus.\n"
+            "- If you see a search bar on the page you are on, you can use it to find other websites to explore.\n"
+            "- If you cannot close a paywall or authwall or if you see something like a captcha on a page, don't want to spend too much time on it and move on to the next site.\n"
+        )
+        hard_constraints = (
+            "HARD CONSTRAINTS:\n"
+            + f"- Max {max_steps} browser steps total.\n"
+            + "- If search quota is exhausted or blocked, STOP IMMEDIATELY with whatever you have.\n"
+            + "- Do NOT wait or retry indefinitely. Return partial results if needed.\n"
+            + "- You MUST cite the exact URL for each fact. If uncertain, say so.\n\n"
+            + "If blocked/quota exhausted: call done() with success=True and your best partial findings.\n\n"
+        )
+
+
+        # ================================
+        # Full System Prompt (task)
+        # ================================
         agent_task = (
-            f"Task: {base_q}\n\n"
-            f"Original query: {input_text}\n\n"
+            f"You are a browsing agent that hunts through the internet to the fullest depth for any information about any subject you are given.\n"
+            + "MUST call the `do_search` tool BEFORE you open any webpage or start browsing with 5 concise, human-readable query parameters. The shorter the query, the better it tends to perform.\n\n"
+            + workflow
+            + nav_constraint
+            + hard_constraints
+
+            + "Task from your user:\n"
+            + f"{base_q}\n\n"
+            + f"Original query: {input_text}\n\n"
             + (f"{deliverables_section}\n\n" if deliverables_section else "")
-            + "WORKFLOW (follow this order):\n"
-            f"1. FIRST use `do_search` with 2-3 queries to find relevant sources.\n"
-            f"2. Open 1-2 of the best result URLs in the browser.\n"
-            f"3. Extract the specific facts/quotes you need with their source URLs.\n"
-            f"4. Stop and return findings with cited URLs.\n\n"
-            f"HARD CONSTRAINTS:\n"
-            f"- Max {self.config.max_steps} browser steps total.\n"
-            f"- If search quota is exhausted or blocked, STOP IMMEDIATELY with whatever you have.\n"
-            f"- Do NOT wait or retry indefinitely. Return partial results if needed.\n"
-            f"- Do NOT navigate directly to URLs you haven't discovered via search.\n"
-            f"- You MUST cite the exact URL for each fact. If uncertain, say so.\n\n"
-            f"If blocked/quota exhausted: call done() with success=True and your best partial findings."
         )
 
         # Enforce step budget when supported by the installed browser_use version.
@@ -197,13 +299,18 @@ class BrowserUseWorker:
         if tools is not None:
             agent_kwargs["tools"] = tools
         try:
-            sig = inspect.signature(Agent)  # some versions expose Agent as a class/callable
+            # `browser_use.Agent` is commonly a class; inspect __init__ for init kwargs.
+            target = Agent.__init__ if inspect.isclass(Agent) else Agent
+            sig = inspect.signature(target)
             params = sig.parameters
             # Try both parameter names (browser_use versions vary)
             if "max_steps" in params:
-                agent_kwargs["max_steps"] = self.config.max_steps
+                agent_kwargs["max_steps"] = max_steps
             if "max_actions" in params:
-                agent_kwargs["max_actions"] = self.config.max_actions
+                agent_kwargs["max_actions"] = max_actions
+            # Add use_vision if supported (helps avoid Langfuse media upload issues)
+            if "use_vision" in params:
+                agent_kwargs["use_vision"] = self.config.use_vision
         except (TypeError, ValueError):
             # Best-effort; prompt-level constraint still applies.
             pass
@@ -213,7 +320,11 @@ class BrowserUseWorker:
 
         formatted = _format_browser_use_history(history)
         evidence = _extract_evidence_from_history(history)
+        formatted = _truncate_text(formatted, max_chars=self.config.max_history_chars)
 
+        duration = time.perf_counter() - start_time
+        print(f"[browser_use worker {self.worker_id}] Completed in {duration:.2f} seconds")
+        
         return WorkerResultExtended(
             worker_id=task["worker_id"],
             findings=formatted,
@@ -225,22 +336,30 @@ class BrowserUseWorker:
                 "agent_task": agent_task,
                 "history_summary": formatted,
             },
-            raw_history=_safe_serialize_history(history),
+            raw_history=_truncate_jsonish(_safe_serialize_history(history), max_chars=self.config.max_raw_history_chars),
         )
 
+# ================================
+# Worker factory
+# ================================
 
 class BrowserUseWorkerFactory(WorkerFactory):
     """Factory for creating BrowserUseWorker instances."""
 
     worker_type = "browser_use"
 
-    def __init__(self, config: BrowserUseWorkerConfig | None = None):
+    def __init__(self, llm_factory: DefaultLLMFactory, config: BrowserUseWorkerConfig | None = None):
+        self.llm_factory = llm_factory
         self.config = config or BrowserUseWorkerConfig()
         _preflight_print_hints(need_search=self.config.use_search_tool)
 
     def create(self, worker_id: str) -> BrowserUseWorker:
-        return BrowserUseWorker(worker_id=worker_id, config=self.config)
+        return BrowserUseWorker(worker_id=worker_id, llm_factory=self.llm_factory, config=self.config)
 
+
+# ================================
+# Helper functions
+# ================================
 
 def _safe_serialize_history(history: Any) -> Any:
     """Best-effort serialization of browser_use history to a JSON-safe object."""
@@ -253,6 +372,76 @@ def _safe_serialize_history(history: Any) -> Any:
             except Exception:
                 pass
     return str(history)
+
+
+def _truncate_text(text: str, *, max_chars: int) -> str:
+    """No-op truncation: returns text as-is."""
+    return text
+
+
+def _truncate_jsonish(obj: Any, *, max_chars: int) -> Any:
+    """No-op truncation: returns object as-is."""
+    return str(obj)
+
+
+class _SearchStatus:
+    OK = "ok"
+    BLOCKED = "blocked"
+
+
+@dataclass
+class _SearchBudget:
+    """Simple quota + dedupe layer for do_search to prevent repeated Tavily spend."""
+
+    max_calls: int
+    max_queries_per_call: int
+    calls: int = 0
+    seen_queries: set[str] = None  # type: ignore[assignment]
+
+    def __post_init__(self) -> None:
+        if self.seen_queries is None:
+            self.seen_queries = set()
+
+    def consume(self, queries: list[str]) -> tuple[list[str], str]:
+        if self.calls >= self.max_calls:
+            return ([], _SearchStatus.BLOCKED)
+        accepted: list[str] = []
+        for q in queries:
+            key = _normalize_query_key(q)
+            if not key or key in self.seen_queries:
+                continue
+            self.seen_queries.add(key)
+            accepted.append(q)
+            if len(accepted) >= self.max_queries_per_call:
+                break
+        self.calls += 1
+        return (accepted, _SearchStatus.OK)
+
+
+_WS_RE = re.compile(r"\s+")
+
+
+def _normalize_query_key(q: str) -> str:
+    q2 = _WS_RE.sub(" ", (q or "").strip().lower())
+    return q2
+
+
+def _normalize_search_queries(queries: list[str]) -> list[str]:
+    """Normalize and dedupe search queries while preserving original text."""
+    out: list[str] = []
+    seen: set[str] = set()
+    for q in queries or []:
+        if not isinstance(q, str):
+            continue
+        q_stripped = _WS_RE.sub(" ", q.strip())
+        if not q_stripped:
+            continue
+        key = _normalize_query_key(q_stripped)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(q_stripped)
+    return out
 
 
 def _format_browser_use_history(history: Any) -> str:
@@ -308,7 +497,7 @@ def _format_browser_use_history(history: Any) -> str:
         content_section = "=== Extracted Content ===\n"
         for idx, content in enumerate(extracted_content, 1):
             # Bound each extraction
-            excerpt = content[:3000] if len(content) > 3000 else content
+            excerpt = content
             content_section += f"\n--- Extraction {idx} ---\n{excerpt}\n"
         sections.append(content_section)
 
@@ -324,15 +513,15 @@ def _format_browser_use_history(history: Any) -> str:
                 goal_text = getattr(thought, "next_goal", "") or ""
                 thoughts_section += f"\n[Step {idx}]\n"
                 if eval_text:
-                    thoughts_section += f"  Eval: {eval_text[:500]}\n"
+                    thoughts_section += f"  Eval: {eval_text}\n"
                 if memory_text:
-                    thoughts_section += f"  Memory: {memory_text[:500]}\n"
+                    thoughts_section += f"  Memory: {memory_text}\n"
                 if goal_text:
-                    thoughts_section += f"  Goal: {goal_text[:300]}\n"
+                    thoughts_section += f"  Goal: {goal_text}\n"
             elif isinstance(thought, dict):
                 thoughts_section += f"\n[Step {idx}] {thought}\n"
             else:
-                thoughts_section += f"\n[Step {idx}] {str(thought)[:500]}\n"
+                thoughts_section += f"\n[Step {idx}] {str(thought)}\n"
         sections.append(thoughts_section)
 
     # 4. Extract actions taken (browser_use 0.11.x has .model_actions)
@@ -345,7 +534,7 @@ def _format_browser_use_history(history: Any) -> str:
             elif isinstance(action, dict):
                 action_dict = action
             else:
-                actions_section += f"  {idx}. {str(action)[:200]}\n"
+                actions_section += f"  {idx}. {str(action)}\n"
                 continue
             # Format action nicely
             for action_name in ["do_search", "go_to_url", "extract_page_content", "done", 
@@ -356,7 +545,7 @@ def _format_browser_use_history(history: Any) -> str:
                         action_str = ", ".join(f"{k}={v!r}" for k, v in action_data.items() 
                                                if v is not None)
                     else:
-                        action_str = str(action_data)[:200]
+                        action_str = str(action_data)
                     actions_section += f"  {idx}. {action_name}: {action_str}\n"
         sections.append(actions_section)
 
@@ -370,7 +559,7 @@ def _format_browser_use_history(history: Any) -> str:
                 is_done = getattr(result, "is_done", False)
                 error = getattr(result, "error", None)
                 if extracted and str(extracted).strip():
-                    excerpt = str(extracted)[:2000]
+                    excerpt = str(extracted)
                     results_section += f"\n[Result {idx}]\n{excerpt}\n"
                 if error:
                     results_section += f"\n[Result {idx} ERROR] {error}\n"
@@ -412,14 +601,10 @@ def _format_browser_use_history(history: Any) -> str:
         # Don't include bound method garbage
         if "<bound method" in text:
             text = "[No structured content extracted from history]"
-        if len(text) > 8000:
-            text = text[:8000] + "\n\n[truncated]"
         return text
 
     full_context = "\n\n".join(sections)
     # Bound total output
-    if len(full_context) > 100000:
-        full_context = full_context[:100000] + "\n\n[truncated]"
     return full_context
 
 
@@ -451,37 +636,6 @@ def _extract_evidence_from_history(history: Any) -> list[dict[str, Any]]:
             seen_urls.add(u)
             evidence.append({"url": u, "excerpt": None})
 
-    # 2. Get extracted content from .extracted_content property
-    try:
-        ec_attr = getattr(history, "extracted_content", None)
-        if ec_attr:
-            if callable(ec_attr):
-                ec_attr = ec_attr()
-            if isinstance(ec_attr, (list, tuple)):
-                for content in ec_attr:
-                    if isinstance(content, str) and content.strip():
-                        # Extract URLs from content
-                        found_urls = [m.group(0).rstrip(".,);]") for m in url_re.finditer(content)]
-                        excerpt = content[:500]
-                        for url in found_urls[:5]:
-                            if url not in seen_urls:
-                                seen_urls.add(url)
-                                evidence.append({"url": url, "excerpt": excerpt})
-    except Exception:
-        pass
-
-    # 3. Get from action_results
-    action_results = _get_list(history, "action_results")
-    for result in action_results:
-        extracted = getattr(result, "extracted_content", None)
-        if isinstance(extracted, str) and extracted.strip():
-            excerpt = extracted[:500]
-            found_urls = [m.group(0).rstrip(".,);]") for m in url_re.finditer(extracted)]
-            for url in found_urls[:5]:
-                if url not in seen_urls:
-                    seen_urls.add(url)
-                    evidence.append({"url": url, "excerpt": excerpt})
-
-    return evidence[:50]
+    return evidence
 
 

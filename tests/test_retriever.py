@@ -210,6 +210,36 @@ class TestObserveAndCompile:
         # Verify LLM was called - the exact content depends on filtering
         mock_llm.invoke.assert_called_once()
 
+    def test_structured_output_fills_citations_as_models_not_dicts(self, sample_state):
+        """Regression test: filling citations after structured output must not leave dicts (pydantic v2)."""
+        from odr.agents.retriever.contracts import CompiledReport
+
+        class StructuredLLM:
+            def with_structured_output(self, _schema, method=None):  # noqa: ANN001
+                class Runner:
+                    def invoke(self, _messages):  # noqa: ANN001
+                        # Structured report but missing citations (common), so compiler fills them.
+                        return CompiledReport(answer="hello", citations=[])
+
+                return Runner()
+
+        llm = StructuredLLM()
+        sample_state["iteration_count"] = 1
+        sample_state["worker_results"] = [
+            WorkerResult(
+                worker_id="worker_1",
+                findings="See https://example.com/source for details",
+                success=True,
+                iteration=1,
+                evidence=[{"url": "https://example.com/source", "excerpt": "details"}],
+            )
+        ]
+
+        result = observe_and_compile(sample_state, llm)  # type: ignore[arg-type]
+        # If citations were dicts, render_compiled_report would raise AttributeError.
+        assert "compiled_output" in result
+        assert "https://example.com/source" in result["compiled_output"]
+
 
 class TestJudgment:
     """Tests for the judgment node."""
@@ -269,6 +299,33 @@ class TestDecideNextAction:
         sample_state["compiled_output"] = "Output"
         sample_state["judgment_decision"] = JudgmentDecision.APPROVE
         result = decide_next_action(sample_state, mock_llm)
+        assert result["next_action"] == "finish"
+        assert result["final_status"] == "success"
+
+    def test_overrides_continue_to_finish_when_judge_approves_with_structured_output(self, sample_state):
+        """If the judge already APPROVEs, we should not keep looping even if the LLM suggests continue."""
+        from odr.agents.retriever.contracts import NextAction, NextActionDecision
+
+        class StructuredLLM:
+            def with_structured_output(self, _schema, method=None):  # noqa: ANN001
+                class Runner:
+                    def invoke(self, _messages):  # noqa: ANN001
+                        return NextActionDecision(
+                            action=NextAction.CONTINUE,
+                            rationale="More research is needed.",
+                            gaps=["optional verification"],
+                            next_worker_guidance="do more",
+                        )
+
+                return Runner()
+
+        llm = StructuredLLM()
+        sample_state["iteration_count"] = 1
+        sample_state["max_iterations"] = 10
+        sample_state["compiled_output"] = "Output"
+        sample_state["judgment_decision"] = JudgmentDecision.APPROVE
+
+        result = decide_next_action(sample_state, llm)  # type: ignore[arg-type]
         assert result["next_action"] == "finish"
         assert result["final_status"] == "success"
 
