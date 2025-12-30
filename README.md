@@ -1,6 +1,6 @@
-# (outdated docs) OSINT Deep Research
+# (outdated docs) Exploring OSINT Deep Research
 
-This project attempts to show how forcing a model to overthink and validate hierarchically for every decision may allow it to have trustworthy creative freedom. Broader prompting with checks-and-balances at each step of the way may apply enough constraint to be precise, while allowing enough creative freedom to find accuracy. 
+My initial vision for this project was to attempt to demonstrate how validating new information in a hierarchal manner (judging outputs from low-level and high-level) may allow workflows to have trustworthy creative freedom. Broader prompting with checks-and-balances and clarification at each step of the way may apply enough constraint to be precise, while allowing enough creative freedom to find accuracy. 
 
 ![First Sketch - to be replaced when/if I finish this project](docs/images/brainstorm.png)
 
