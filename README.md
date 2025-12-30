@@ -25,14 +25,7 @@ osint-research
 
 ## Design
 
-Agents will be called in "Procedures" (Workflows), where they have the opportunity to modify the outgoing deliverable as a team of sorts. I took inspiration from the Arazzo Spec for my decision to create deterministic workflows, since static procedures take the guesswork out of having agents rely on their own taste for how to deliver long-strung multi-tool workflows (wherever possible). 
-
-
-## Influence
-
-I wanted to build a Deep Research framework that looks **very deep**, judges itself aggressively using voting, and has increased friction to report a deliverable (where retrieved information must be confirmed or rejected + recollected, instead of immediately treating new context as true or relevant). 
-
-This Deep Research agent just so happens to be tailored for OSINT tasks (OSINT-based tool calls). 
+Agents will be called in "Procedures/Workflows" (UPDATE - I didn't do it like this), where they have the opportunity to modify the outgoing deliverable as a team of sorts. I took some inspiration from the Arazzo Spec for my decision to keep the agent graph static at a high-level since static procedures take the guesswork out of having agents rely on their own taste for how to deliver long-strung multi-tool workflows (wherever possible). 
 
 
 ### Why should we be extra selective about each research step?
@@ -48,7 +41,7 @@ I hope to fix this issue by using a combination of Tool-Calls that 1) fan-out an
 
 It's a cardinal sin to just guess, but here I am. 
 
-I want to **attempt this project with a fresh perspective before poisoning my own context**. I'll research later, once I've exhausted my own creativity and require better results. Unfortunately, one of the main caveats of my decision to attempt original thoughts first is that they are more likely to be incorrect (hence this entire experiment, ironically) - so this project may not perform well. As of now, I have a running list of assumptions influencing my design based on what I have seen in the wild:
+I want to **attempt this project with a fresh perspective before poisoning my own context** by reading other research about Deep Research agents. I will research later, once I'm done exploring, or have exhausted my own creativity and require better results. Unfortunately, one of the main caveats of my decision to attempt original thoughts first is that they are more likely to be incorrect (hence this entire experiment, ironically) - so this project may not perform well. As of now, I have a running list of assumptions influencing my design based on what I have seen in the wild:
 
 - ReAct / ReWOO Loops (+ Nested) Work, But They Need More Focus - Previous steps shouldn't set future focus, but they should definitely impact future focus somehow. 
 
